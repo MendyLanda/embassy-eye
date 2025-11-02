@@ -1,0 +1,327 @@
+"""
+Helper functions for filling form fields.
+"""
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
+import time
+
+from config import DEFAULT_VALUES, FIELD_MAP, DEFAULT_TEXTAREA_VALUE, CHAR_TYPE_DELAY
+from webdriver_utils import scroll_to_element
+
+
+def fill_select_dropdowns(driver, selects):
+    """Fill standard HTML select dropdowns."""
+    if not selects:
+        return
+    
+    print(f"\nFilling {len(selects)} select dropdown(s)...")
+    for select in selects:
+        try:
+            select_id = select.get_attribute("id")
+            select_name = select.get_attribute("name")
+            select_obj = Select(select)
+            options = select_obj.options
+            print(f"  Select '{select_id or select_name}' has {len(options)} options")
+            if len(options) > 1:
+                # Select the second option (skip first if it's placeholder)
+                select_obj.select_by_index(1)
+                selected_option = options[1].text
+                print(f"  ✓ Selected: '{selected_option}'")
+            elif len(options) == 1:
+                select_obj.select_by_index(0)
+                print(f"  ✓ Selected first option: '{options[0].text}'")
+        except Exception as e:
+            print(f"  ✗ Error filling select: {e}")
+
+
+def fill_reenter_email_field(driver):
+    """Fill the re-enter email field with special handling."""
+    print("\nFilling re-enter email field (found by label text)...")
+    filled_count = 0
+    
+    try:
+        # Find the re-enter email field by its label
+        reenter_email_label = driver.find_element(
+            By.XPATH,
+            "//label[contains(text(), 'Re-enter') or contains(text(), 're-enter') or contains(text(), 'Reenter')]"
+        )
+        reenter_email_id = reenter_email_label.get_attribute("for")
+        
+        if reenter_email_id:
+            reenter_email_field = driver.find_element(By.ID, reenter_email_id)
+            
+            if reenter_email_field.is_displayed():
+                print(f"  Found re-enter email field (ID: {reenter_email_id})")
+                scroll_to_element(driver, reenter_email_field)
+                time.sleep(0.2)
+                
+                # Remove the onpaste restriction first
+                driver.execute_script("arguments[0].removeAttribute('onpaste')", reenter_email_field)
+                time.sleep(0.1)
+                
+                # Clear the field
+                driver.execute_script("arguments[0].value = '';", reenter_email_field)
+                time.sleep(0.1)
+                
+                # Focus the field
+                reenter_email_field.click()
+                driver.execute_script("arguments[0].focus();", reenter_email_field)
+                time.sleep(0.2)
+                
+                # Type character by character using send_keys()
+                print(f"    Typing '{DEFAULT_VALUES['email']}' character by character with send_keys()...")
+                for char in DEFAULT_VALUES["email"]:
+                    reenter_email_field.send_keys(char)
+                    time.sleep(CHAR_TYPE_DELAY)
+                
+                time.sleep(0.3)  # Wait for field to process all characters
+                
+                # Verify the value was set
+                actual_value = reenter_email_field.get_attribute("value")
+                if actual_value == DEFAULT_VALUES["email"]:
+                    print(f"  ✓ Filled re-enter email field via send_keys(): {DEFAULT_VALUES['email']}")
+                    filled_count += 1
+                else:
+                    print(f"  ⚠ Value mismatch: expected '{DEFAULT_VALUES['email']}', got '{actual_value}'")
+                    print(f"    Attempting to fix...")
+                    
+                    # Try to fix by typing remaining characters
+                    if len(actual_value) < len(DEFAULT_VALUES["email"]):
+                        missing_chars = DEFAULT_VALUES["email"][len(actual_value):]
+                        for char in missing_chars:
+                            reenter_email_field.send_keys(char)
+                            time.sleep(CHAR_TYPE_DELAY)
+                        
+                        time.sleep(0.3)
+                        actual_value = reenter_email_field.get_attribute("value")
+                        if actual_value == DEFAULT_VALUES["email"]:
+                            print(f"  ✓ Fixed and filled re-enter email field")
+                            filled_count += 1
+                        else:
+                            print(f"  ✗ Could not fill correctly. Final value: '{actual_value}'")
+                    else:
+                        print(f"  ✗ Could not fill correctly. Got: '{actual_value}'")
+            else:
+                print(f"  ⊙ Re-enter email field found but not visible")
+        else:
+            print(f"  ⊙ Re-enter email label found but no 'for' attribute")
+    except NoSuchElementException:
+        print(f"  ⊙ Re-enter email field not found (may not be present on this form)")
+    except Exception as e:
+        print(f"  ✗ Error finding/filling re-enter email field: {e}")
+    
+    return filled_count
+
+
+def fill_date_of_birth_field(driver):
+    """Fill the date of birth field with special date picker handling."""
+    print(f"  Filling date of birth field (birthDate)...")
+    filled_count = 0
+    
+    try:
+        # Find the date picker input
+        date_input = driver.find_element(By.ID, "birthDate")
+        scroll_to_element(driver, date_input)
+        time.sleep(0.3)
+        
+        # Clear and fill the date input
+        date_input.clear()
+        time.sleep(0.1)
+        date_input.send_keys(DEFAULT_VALUES["date_of_birth"])
+        time.sleep(0.3)
+        
+        # Also try to set the value via the date picker component
+        try:
+            date_picker = driver.find_element(By.ID, "birthDateComponent")
+            driver.execute_script("arguments[0].value = arguments[1];", date_picker, DEFAULT_VALUES["date_of_birth_iso"])
+            # Trigger change event
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", date_picker)
+        except:
+            pass
+        
+        print(f"  ✓ Filled date of birth: {DEFAULT_VALUES['date_of_birth']}")
+        filled_count += 1
+    except Exception as e:
+        print(f"  ✗ Could not fill date of birth: {e}")
+    
+    return filled_count
+
+
+def fill_checkbox_field(driver, field_id):
+    """Fill a checkbox field."""
+    filled_count = 0
+    
+    try:
+        checkbox = driver.find_element(By.ID, field_id)
+        if checkbox.is_displayed() and not checkbox.is_selected():
+            scroll_to_element(driver, checkbox)
+            time.sleep(0.2)
+            checkbox.click()
+            print(f"  ✓ Checked checkbox: {field_id}")
+            filled_count += 1
+    except NoSuchElementException:
+        print(f"  ⊙ Field {field_id} not found (might be hidden or not present)")
+    except Exception as e:
+        print(f"  ✗ Could not fill field {field_id}: {e}")
+    
+    return filled_count
+
+
+def fill_text_field(driver, field_id, value):
+    """Fill a regular text input field."""
+    filled_count = 0
+    
+    try:
+        input_field = driver.find_element(By.ID, field_id)
+        if input_field.is_displayed():
+            scroll_to_element(driver, input_field)
+            time.sleep(0.2)
+            
+            # Skip fields with onpaste attribute (re-enter email already handled separately)
+            try:
+                onpaste_attr = input_field.get_attribute("onpaste")
+                if onpaste_attr:
+                    print(f"  ⊙ Skipping field {field_id} (has onpaste, already handled separately)")
+                    return filled_count
+            except:
+                pass
+            
+            # Skip if this is a re-enter email field (already handled separately)
+            try:
+                label = driver.find_element(By.XPATH, f"//label[@for='{field_id}']")
+                label_text = label.text.lower() if label else ""
+                if "re-enter" in label_text or "reenter" in label_text:
+                    print(f"  ⊙ Skipping field {field_id} (re-enter email, already handled separately)")
+                    return filled_count
+            except:
+                pass
+            
+            # Clear field
+            try:
+                input_field.clear()
+            except:
+                try:
+                    input_field.send_keys(Keys.CONTROL + "a")
+                    input_field.send_keys(Keys.DELETE)
+                except:
+                    # Use JavaScript to clear
+                    driver.execute_script("arguments[0].value = '';", input_field)
+            
+            time.sleep(0.1)
+            
+            # Fill field
+            try:
+                input_field.send_keys(value)
+                print(f"  ✓ Filled {field_id} (text): {value}")
+            except:
+                # Fallback: JavaScript
+                driver.execute_script("arguments[0].value = arguments[1];", input_field, value)
+                driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", input_field)
+                driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", input_field)
+                print(f"  ✓ Filled {field_id} (text) via JavaScript: {value}")
+            
+            filled_count += 1
+    except NoSuchElementException:
+        print(f"  ⊙ Field {field_id} not found (might be hidden or not present)")
+    except Exception as e:
+        print(f"  ✗ Could not fill field {field_id}: {e}")
+    
+    return filled_count
+
+
+def fill_fields_by_map(driver):
+    """Fill all fields defined in FIELD_MAP."""
+    print("\nFilling specific fields by ID...")
+    filled_count = 0
+    
+    for field_id, (field_type, value) in FIELD_MAP.items():
+        try:
+            if field_type == "checkbox":
+                filled_count += fill_checkbox_field(driver, field_id)
+            elif field_id == "birthDate":
+                filled_count += fill_date_of_birth_field(driver)
+            else:
+                filled_count += fill_text_field(driver, field_id, value)
+        except Exception as e:
+            print(f"  ✗ Could not fill field {field_id}: {e}")
+    
+    return filled_count
+
+
+def fill_remaining_fields(driver, inputs):
+    """Fill any remaining fields that might have been missed."""
+    print("\nFilling remaining fields...")
+    filled_count = 0
+    filled_ids = set(FIELD_MAP.keys())
+    
+    for input_field in inputs:
+        input_type = input_field.get_attribute("type") or "text"
+        input_id = input_field.get_attribute("id") or ""
+        input_name = input_field.get_attribute("name") or ""
+        
+        # Skip fields already handled by field_map
+        if input_id in filled_ids:
+            continue
+        
+        # Skip hidden, submit, button types
+        if input_type in ["hidden", "submit", "button", "image"]:
+            continue
+        
+        # Skip if already has a value
+        try:
+            current_value = input_field.get_attribute("value") or ""
+            if current_value and input_type not in ["checkbox", "radio"] and len(current_value.strip()) > 0:
+                print(f"  ⊙ Skipping '{input_id or input_name}' (already filled with '{current_value}')")
+                continue
+        except:
+            pass
+        
+        try:
+            # Only handle checkboxes if visible
+            if input_type == "checkbox":
+                if input_field.is_displayed() and not input_field.is_selected():
+                    scroll_to_element(driver, input_field)
+                    time.sleep(0.2)
+                    input_field.click()
+                    print(f"  ✓ Checked checkbox: {input_id or input_name or 'unknown'}")
+                    filled_count += 1
+                continue
+            
+            elif input_type == "radio":
+                # Radio buttons - skip (already handled in dropdowns)
+                continue
+            
+            # Skip other fields as they should already be handled by field_map
+            else:
+                print(f"  ⊙ Skipping unexpected field: {input_id or input_name or 'unknown'} (type: {input_type})")
+                continue
+        except Exception as e:
+            print(f"  ⊙ Could not process field {input_id or input_name or 'unknown'}: {e}")
+    
+    return filled_count
+
+
+def fill_textareas(driver, textareas, wait):
+    """Fill all textarea fields."""
+    from selenium.webdriver.support import expected_conditions as EC
+    
+    filled_count = 0
+    
+    for textarea in textareas:
+        try:
+            wait.until(EC.element_to_be_clickable(textarea))
+            scroll_to_element(driver, textarea)
+            time.sleep(0.3)
+            textarea.clear()
+            textarea.send_keys(DEFAULT_TEXTAREA_VALUE)
+            print(f"  ✓ Filled textarea: {textarea.get_attribute('id') or textarea.get_attribute('name')}")
+            filled_count += 1
+        except Exception as e:
+            print(f"  ✗ Could not fill textarea: {e}")
+    
+    return filled_count
+
