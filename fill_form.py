@@ -3,8 +3,6 @@
 Script to fill the booking form on konzinfobooking.mfa.gov.hu
 """
 
-import time
-
 from webdriver_utils import create_driver, navigate_to_booking_page, inspect_form_fields
 from dropdown_handlers import select_consulate_option, select_visa_type_option
 from form_helpers import (
@@ -16,14 +14,14 @@ from form_helpers import (
 )
 from button_handlers import click_next_button
 from modal_checker import check_appointment_availability
-from config import INSPECTION_TIME
+from telegram_notifier import send_result_notification
 
 
 def fill_booking_form():
     """Fill the booking form with acceptable values and click save (without submitting)"""
     
     # Initialize Chrome driver
-    driver = create_driver(headless=False)
+    driver = create_driver(headless=True)
     
     try:
         # Navigate to the booking page
@@ -62,14 +60,22 @@ def fill_booking_form():
         print(f"\n=== Summary: Filled {filled_count} field(s) ===\n")
         
         # Click the next button
+        slots_available = None
         if click_next_button(driver):
             # Check for appointment availability
-            check_appointment_availability(driver)
+            slots_available = check_appointment_availability(driver)
+            
+            # Only send notification if slots are found
+            if slots_available:
+                print("\n=== Taking screenshot for Telegram ===")
+                # Take screenshot and send directly without saving
+                screenshot_bytes = driver.get_screenshot_as_png()
+                
+                print("\n=== Sending Telegram notification ===")
+                send_result_notification(slots_available, screenshot_bytes)
         
-        # Keep browser open for inspection
-        print(f"\nKeeping browser open for {INSPECTION_TIME} seconds for inspection...")
-        print("Press Ctrl+C in terminal to close early")
-        time.sleep(INSPECTION_TIME)
+        # Keep browser open for inspection (only if not headless)
+        # Since we're in headless mode, skip the inspection delay
         
     except Exception as e:
         print(f"\nError: {e}")
