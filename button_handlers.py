@@ -82,3 +82,4 @@ def click_next_button(driver):
         print("Next button not found!")
         return False
 
+

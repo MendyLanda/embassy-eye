@@ -52,3 +52,4 @@ INSPECTION_TIME = 30
 # Textarea default value
 DEFAULT_TEXTAREA_VALUE = "Test message"
 
+

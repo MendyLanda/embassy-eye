@@ -520,3 +520,4 @@ def _debug_visa_type_search(driver):
         lbl_text = lbl.text
         print(f"    Label: text='{lbl_text[:50]}', for='{lbl_for}'")
 
+
