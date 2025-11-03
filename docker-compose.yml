@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  embassy-eye:
+    build: .
+    container_name: embassy-eye
+    environment:
+      # Telegram configuration - set these in .env file or override here
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_USER_ID=${TELEGRAM_USER_ID}
+    env_file:
+      - .env
+    # Uncomment to run on a schedule (requires cron or similar)
+    # restart: unless-stopped
+
