@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 import time
+import random
 
 from config import DEFAULT_VALUES, FIELD_MAP, DEFAULT_TEXTAREA_VALUE, CHAR_TYPE_DELAY
 from webdriver_utils import scroll_to_element
@@ -32,6 +33,8 @@ def fill_select_dropdowns(driver, selects):
             elif len(options) == 1:
                 select_obj.select_by_index(0)
                 print(f"Filled select {select_id or select_name}: {options[0].text}")
+            # Random delay between fills
+            time.sleep(random.uniform(0.2, 0.5))
         except Exception as e:
             pass
 
@@ -209,6 +212,8 @@ def fill_text_field(driver, field_id, value):
                 driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", input_field)
                 print(f"Filled {field_id}: {value}")
             
+            # Random delay between field fills to simulate human typing
+            time.sleep(random.uniform(0.3, 0.7))
             filled_count += 1
     except NoSuchElementException:
         pass
