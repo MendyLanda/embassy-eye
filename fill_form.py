@@ -15,6 +15,7 @@ from form_helpers import (
 from button_handlers import click_next_button
 from modal_checker import check_appointment_availability
 from telegram_notifier import send_result_notification
+from pathlib import Path
 
 
 def fill_booking_form():
@@ -29,8 +30,8 @@ def fill_booking_form():
         
         # Inspect form fields
         inputs, selects, textareas = inspect_form_fields(driver)
-        
-        print("\n=== Filling Form Fields ===\n")
+
+        print("\n=== Parsing started ===\n")
         
         # Step 1: Select consulate option (Serbia - Subotica)
         select_consulate_option(driver)
@@ -42,7 +43,6 @@ def fill_booking_form():
         fill_select_dropdowns(driver, selects)
         
         # Fill form fields with default data
-        print("\n=== Filling Form Fields with Default Data ===")
         filled_count = 0
         
         # Fill re-enter email field (special handling)
@@ -59,6 +59,20 @@ def fill_booking_form():
         
         print(f"\n=== Summary: Filled {filled_count} field(s) ===\n")
         
+        # If nothing was filled, persist the current page HTML once for offline inspection
+        if filled_count == 0:
+            html_path = Path("screenshots/filled_0_fields.html")
+            try:
+                if not html_path.exists():
+                    html_path.parent.mkdir(parents=True, exist_ok=True)
+                    with html_path.open("w", encoding="utf-8") as f:
+                        f.write(driver.page_source)
+                    print(f"Saved HTML to {html_path}")
+                else:
+                    print(f"HTML already exists at {html_path}, skipping download")
+            except Exception as e:
+                print(f"Failed to save HTML: {e}")
+        
         # Click the next button
         slots_available = None
         if click_next_button(driver):
@@ -67,11 +81,7 @@ def fill_booking_form():
             
             # Only send notification if slots are found
             if slots_available:
-                print("\n=== Taking screenshot for Telegram ===")
-                # Take screenshot and send directly without saving
                 screenshot_bytes = driver.get_screenshot_as_png()
-                
-                print("\n=== Sending Telegram notification ===")
                 send_result_notification(slots_available, screenshot_bytes)
         
         # Keep browser open for inspection (only if not headless)

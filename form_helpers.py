@@ -18,29 +18,26 @@ def fill_select_dropdowns(driver, selects):
     if not selects:
         return
     
-    print(f"\nFilling {len(selects)} select dropdown(s)...")
     for select in selects:
         try:
             select_id = select.get_attribute("id")
             select_name = select.get_attribute("name")
             select_obj = Select(select)
             options = select_obj.options
-            print(f"  Select '{select_id or select_name}' has {len(options)} options")
             if len(options) > 1:
                 # Select the second option (skip first if it's placeholder)
                 select_obj.select_by_index(1)
                 selected_option = options[1].text
-                print(f"  ✓ Selected: '{selected_option}'")
+                print(f"Filled select {select_id or select_name}: {selected_option}")
             elif len(options) == 1:
                 select_obj.select_by_index(0)
-                print(f"  ✓ Selected first option: '{options[0].text}'")
+                print(f"Filled select {select_id or select_name}: {options[0].text}")
         except Exception as e:
-            print(f"  ✗ Error filling select: {e}")
+            pass
 
 
 def fill_reenter_email_field(driver):
     """Fill the re-enter email field with special handling."""
-    print("\nFilling re-enter email field (found by label text)...")
     filled_count = 0
     
     try:
@@ -55,7 +52,6 @@ def fill_reenter_email_field(driver):
             reenter_email_field = driver.find_element(By.ID, reenter_email_id)
             
             if reenter_email_field.is_displayed():
-                print(f"  Found re-enter email field (ID: {reenter_email_id})")
                 scroll_to_element(driver, reenter_email_field)
                 time.sleep(0.2)
                 
@@ -73,7 +69,6 @@ def fill_reenter_email_field(driver):
                 time.sleep(0.2)
                 
                 # Type character by character using send_keys()
-                print(f"    Typing '{DEFAULT_VALUES['email']}' character by character with send_keys()...")
                 for char in DEFAULT_VALUES["email"]:
                     reenter_email_field.send_keys(char)
                     time.sleep(CHAR_TYPE_DELAY)
@@ -83,11 +78,10 @@ def fill_reenter_email_field(driver):
                 # Verify the value was set
                 actual_value = reenter_email_field.get_attribute("value")
                 if actual_value == DEFAULT_VALUES["email"]:
-                    print(f"  ✓ Filled re-enter email field via send_keys(): {DEFAULT_VALUES['email']}")
+                    print("Filled re-enter email field")
                     filled_count += 1
                 else:
-                    print(f"  ⚠ Value mismatch: expected '{DEFAULT_VALUES['email']}', got '{actual_value}'")
-                    print(f"    Attempting to fix...")
+                    # Attempt to fix by typing remaining characters
                     
                     # Try to fix by typing remaining characters
                     if len(actual_value) < len(DEFAULT_VALUES["email"]):
@@ -99,27 +93,20 @@ def fill_reenter_email_field(driver):
                         time.sleep(0.3)
                         actual_value = reenter_email_field.get_attribute("value")
                         if actual_value == DEFAULT_VALUES["email"]:
-                            print(f"  ✓ Fixed and filled re-enter email field")
+                            print("Filled re-enter email field")
                             filled_count += 1
-                        else:
-                            print(f"  ✗ Could not fill correctly. Final value: '{actual_value}'")
-                    else:
-                        print(f"  ✗ Could not fill correctly. Got: '{actual_value}'")
-            else:
-                print(f"  ⊙ Re-enter email field found but not visible")
-        else:
-            print(f"  ⊙ Re-enter email label found but no 'for' attribute")
+            
+            
     except NoSuchElementException:
-        print(f"  ⊙ Re-enter email field not found (may not be present on this form)")
+        pass
     except Exception as e:
-        print(f"  ✗ Error finding/filling re-enter email field: {e}")
+        pass
     
     return filled_count
 
 
 def fill_date_of_birth_field(driver):
     """Fill the date of birth field with special date picker handling."""
-    print(f"  Filling date of birth field (birthDate)...")
     filled_count = 0
     
     try:
@@ -143,10 +130,10 @@ def fill_date_of_birth_field(driver):
         except:
             pass
         
-        print(f"  ✓ Filled date of birth: {DEFAULT_VALUES['date_of_birth']}")
+        print(f"Filled birthDate: {DEFAULT_VALUES['date_of_birth']}")
         filled_count += 1
     except Exception as e:
-        print(f"  ✗ Could not fill date of birth: {e}")
+        pass
     
     return filled_count
 
@@ -161,12 +148,12 @@ def fill_checkbox_field(driver, field_id):
             scroll_to_element(driver, checkbox)
             time.sleep(0.2)
             checkbox.click()
-            print(f"  ✓ Checked checkbox: {field_id}")
+            print(f"Filled checkbox {field_id}")
             filled_count += 1
     except NoSuchElementException:
-        print(f"  ⊙ Field {field_id} not found (might be hidden or not present)")
+        pass
     except Exception as e:
-        print(f"  ✗ Could not fill field {field_id}: {e}")
+        pass
     
     return filled_count
 
@@ -185,7 +172,6 @@ def fill_text_field(driver, field_id, value):
             try:
                 onpaste_attr = input_field.get_attribute("onpaste")
                 if onpaste_attr:
-                    print(f"  ⊙ Skipping field {field_id} (has onpaste, already handled separately)")
                     return filled_count
             except:
                 pass
@@ -195,7 +181,6 @@ def fill_text_field(driver, field_id, value):
                 label = driver.find_element(By.XPATH, f"//label[@for='{field_id}']")
                 label_text = label.text.lower() if label else ""
                 if "re-enter" in label_text or "reenter" in label_text:
-                    print(f"  ⊙ Skipping field {field_id} (re-enter email, already handled separately)")
                     return filled_count
             except:
                 pass
@@ -216,26 +201,25 @@ def fill_text_field(driver, field_id, value):
             # Fill field
             try:
                 input_field.send_keys(value)
-                print(f"  ✓ Filled {field_id} (text): {value}")
+                print(f"Filled {field_id}: {value}")
             except:
                 # Fallback: JavaScript
                 driver.execute_script("arguments[0].value = arguments[1];", input_field, value)
                 driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", input_field)
                 driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", input_field)
-                print(f"  ✓ Filled {field_id} (text) via JavaScript: {value}")
+                print(f"Filled {field_id}: {value}")
             
             filled_count += 1
     except NoSuchElementException:
-        print(f"  ⊙ Field {field_id} not found (might be hidden or not present)")
+        pass
     except Exception as e:
-        print(f"  ✗ Could not fill field {field_id}: {e}")
+        pass
     
     return filled_count
 
 
 def fill_fields_by_map(driver):
     """Fill all fields defined in FIELD_MAP."""
-    print("\nFilling specific fields by ID...")
     filled_count = 0
     
     for field_id, (field_type, value) in FIELD_MAP.items():
@@ -247,14 +231,13 @@ def fill_fields_by_map(driver):
             else:
                 filled_count += fill_text_field(driver, field_id, value)
         except Exception as e:
-            print(f"  ✗ Could not fill field {field_id}: {e}")
+            pass
     
     return filled_count
 
 
 def fill_remaining_fields(driver, inputs):
     """Fill any remaining fields that might have been missed."""
-    print("\nFilling remaining fields...")
     filled_count = 0
     filled_ids = set(FIELD_MAP.keys())
     
@@ -275,7 +258,6 @@ def fill_remaining_fields(driver, inputs):
         try:
             current_value = input_field.get_attribute("value") or ""
             if current_value and input_type not in ["checkbox", "radio"] and len(current_value.strip()) > 0:
-                print(f"  ⊙ Skipping '{input_id or input_name}' (already filled with '{current_value}')")
                 continue
         except:
             pass
@@ -287,7 +269,7 @@ def fill_remaining_fields(driver, inputs):
                     scroll_to_element(driver, input_field)
                     time.sleep(0.2)
                     input_field.click()
-                    print(f"  ✓ Checked checkbox: {input_id or input_name or 'unknown'}")
+                    print(f"Filled checkbox {input_id or input_name or 'unknown'}")
                     filled_count += 1
                 continue
             
@@ -297,10 +279,9 @@ def fill_remaining_fields(driver, inputs):
             
             # Skip other fields as they should already be handled by field_map
             else:
-                print(f"  ⊙ Skipping unexpected field: {input_id or input_name or 'unknown'} (type: {input_type})")
                 continue
         except Exception as e:
-            print(f"  ⊙ Could not process field {input_id or input_name or 'unknown'}: {e}")
+            pass
     
     return filled_count
 
@@ -318,10 +299,10 @@ def fill_textareas(driver, textareas, wait):
             time.sleep(0.3)
             textarea.clear()
             textarea.send_keys(DEFAULT_TEXTAREA_VALUE)
-            print(f"  ✓ Filled textarea: {textarea.get_attribute('id') or textarea.get_attribute('name')}")
+            print(f"Filled textarea {textarea.get_attribute('id') or textarea.get_attribute('name')}")
             filled_count += 1
         except Exception as e:
-            print(f"  ✗ Could not fill textarea: {e}")
+            pass
     
     return filled_count
 
