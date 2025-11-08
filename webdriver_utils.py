@@ -7,6 +7,7 @@ import os
 import random
 import json
 import time
+import threading
 
 # Disable PyCharm debugger tracing to avoid warnings
 if 'pydevd' in sys.modules:
@@ -142,11 +143,139 @@ def get_random_device_profile():
     }
 
 
+def test_network_connectivity():
+    """Test network connectivity to diagnose VPN/Docker issues."""
+    print("\n  === Network Connectivity Test ===")
+    sys.stdout.flush()
+    
+    import socket
+    import subprocess
+    
+    tests_passed = 0
+    tests_failed = 0
+    
+    # Test 1: DNS resolution
+    print("  [1] Testing DNS resolution...")
+    sys.stdout.flush()
+    try:
+        socket.gethostbyname('google.com')
+        print("    ✓ DNS resolution: OK")
+        tests_passed += 1
+    except Exception as e:
+        print(f"    ✗ DNS resolution: FAILED ({e})")
+        tests_failed += 1
+    sys.stdout.flush()
+    
+    # Test 2: HTTP connectivity to Google (Chrome might try this)
+    print("  [2] Testing HTTP connectivity to google.com...")
+    sys.stdout.flush()
+    try:
+        import urllib.request
+        response = urllib.request.urlopen('http://www.google.com', timeout=5)
+        print(f"    ✓ HTTP connectivity: OK (status: {response.getcode()})")
+        tests_passed += 1
+    except Exception as e:
+        print(f"    ✗ HTTP connectivity: FAILED ({e})")
+        tests_failed += 1
+    sys.stdout.flush()
+    
+    # Test 3: HTTPS connectivity to Google
+    print("  [3] Testing HTTPS connectivity to google.com...")
+    sys.stdout.flush()
+    try:
+        import ssl
+        context = ssl.create_default_context()
+        response = urllib.request.urlopen('https://www.google.com', timeout=5, context=context)
+        print(f"    ✓ HTTPS connectivity: OK (status: {response.getcode()})")
+        tests_passed += 1
+    except Exception as e:
+        print(f"    ✗ HTTPS connectivity: FAILED ({e})")
+        tests_failed += 1
+    sys.stdout.flush()
+    
+    # Test 4: Target website connectivity
+    print(f"  [4] Testing connectivity to target website ({BOOKING_URL})...")
+    sys.stdout.flush()
+    try:
+        import ssl
+        context = ssl.create_default_context()
+        response = urllib.request.urlopen(BOOKING_URL, timeout=10, context=context)
+        print(f"    ✓ Target website: OK (status: {response.getcode()})")
+        tests_passed += 1
+    except Exception as e:
+        print(f"    ✗ Target website: FAILED ({e})")
+        tests_failed += 1
+    sys.stdout.flush()
+    
+    # Test 5: Check VPN interface (if WireGuard is running)
+    print("  [5] Checking for VPN interface...")
+    sys.stdout.flush()
+    try:
+        result = subprocess.run(['ip', 'link', 'show'], capture_output=True, text=True, timeout=5)
+        if 'wg' in result.stdout.lower() or 'wireguard' in result.stdout.lower():
+            print("    ✓ VPN interface detected")
+            tests_passed += 1
+        else:
+            print("    ⚠ VPN interface not found (might be using host network)")
+            tests_passed += 1  # Not a failure, just info
+    except Exception as e:
+        print(f"    ⚠ Could not check VPN interface: {e}")
+        tests_passed += 1  # Not critical
+    
+    # Test 6: Check routing table
+    print("  [6] Checking routing table...")
+    sys.stdout.flush()
+    try:
+        result = subprocess.run(['ip', 'route'], capture_output=True, text=True, timeout=5)
+        print(f"    Routing info: {len(result.stdout.splitlines())} routes found")
+        # Show first few routes
+        routes = result.stdout.splitlines()[:3]
+        for route in routes:
+            print(f"      - {route}")
+        tests_passed += 1
+    except Exception as e:
+        print(f"    ⚠ Could not check routing: {e}")
+        tests_passed += 1  # Not critical
+    sys.stdout.flush()
+    
+    # Test 7: Check if we can resolve Chrome-related domains
+    print("  [7] Testing Chrome-related domain resolution...")
+    sys.stdout.flush()
+    chrome_domains = ['dl.google.com', 'clients2.google.com', 'update.googleapis.com']
+    for domain in chrome_domains:
+        try:
+            socket.gethostbyname(domain)
+            print(f"    ✓ {domain}: resolvable")
+        except Exception as e:
+            print(f"    ✗ {domain}: NOT resolvable ({e})")
+    sys.stdout.flush()
+    
+    print(f"\n  === Test Summary: {tests_passed} passed, {tests_failed} failed ===")
+    sys.stdout.flush()
+    
+    if tests_failed > 0:
+        print("  ⚠ WARNING: Some connectivity tests failed. This might cause Chrome to hang.")
+        print("  ⚠ VPN might be blocking or routing traffic incorrectly.")
+        sys.stdout.flush()
+    
+    return tests_failed == 0
+
+
 def create_driver(headless=False):
     """Create and configure a Chrome WebDriver instance with anti-detection measures.
     
     Each run uses a randomly generated device profile to avoid fingerprinting.
     """
+    # Test network connectivity first (especially important with VPN)
+    print("  Testing network connectivity...")
+    sys.stdout.flush()
+    network_ok = test_network_connectivity()
+    
+    if not network_ok:
+        print("  ⚠ Network connectivity issues detected. Chrome might hang during initialization.")
+        print("  Continuing anyway, but expect potential delays...")
+        sys.stdout.flush()
+    
     print("  Generating random device profile...")
     sys.stdout.flush()
     # Generate a random device profile for this session
@@ -173,6 +302,27 @@ def create_driver(headless=False):
             options.add_argument('--disable-component-update')
             options.add_argument('--no-first-run')
             options.add_argument('--disable-default-apps')
+            options.add_argument('--disable-background-timer-throttling')
+            options.add_argument('--disable-backgrounding-occluded-windows')
+            options.add_argument('--disable-breakpad')
+            options.add_argument('--disable-client-side-phishing-detection')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-features=TranslateUI')
+            options.add_argument('--disable-hang-monitor')
+            options.add_argument('--disable-ipc-flooding-protection')
+            options.add_argument('--disable-popup-blocking')
+            options.add_argument('--disable-prompt-on-repost')
+            options.add_argument('--disable-renderer-backgrounding')
+            options.add_argument('--disable-translate')
+            options.add_argument('--metrics-recording-only')
+            options.add_argument('--safebrowsing-disable-auto-update')
+            options.add_argument('--password-store=basic')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-software-rasterizer')
+            # DNS and network-related flags
+            options.add_argument('--dns-prefetch-disable')
+            options.add_argument('--disable-dns-prefetch')
+            options.add_argument('--disable-features=NetworkService,NetworkServiceInProcess')
             
             # Additional stealth options
             options.add_argument('--disable-blink-features=AutomationControlled')
@@ -189,8 +339,58 @@ def create_driver(headless=False):
             
             print("  Creating Chrome driver instance...")
             sys.stdout.flush()
-            # Create driver with undetected_chromedriver (let it auto-detect version)
-            driver = uc.Chrome(options=options, use_subprocess=True)
+            
+            # Create driver with timeout protection (for VPN-related hangs)
+            driver = None
+            driver_error = None
+            
+            def create_driver_thread():
+                nonlocal driver, driver_error
+                try:
+                    # Try to get Chrome version to avoid auto-detection delays
+                    import subprocess
+                    try:
+                        chrome_version_output = subprocess.check_output(
+                            ['google-chrome', '--version'], 
+                            stderr=subprocess.STDOUT, 
+                            timeout=5
+                        ).decode('utf-8')
+                        # Extract version number (e.g., "Google Chrome 131.0.6778.85" -> 131)
+                        import re
+                        version_match = re.search(r'(\d+)\.', chrome_version_output)
+                        if version_match:
+                            version_main = int(version_match.group(1))
+                            print(f"  Detected Chrome version: {version_main}")
+                            sys.stdout.flush()
+                            # Use specific version to avoid auto-detection
+                            driver = uc.Chrome(options=options, use_subprocess=True, version_main=version_main)
+                        else:
+                            driver = uc.Chrome(options=options, use_subprocess=True)
+                    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError, ValueError):
+                        # Fallback to auto-detection if version detection fails
+                        print("  Could not detect Chrome version, using auto-detection...")
+                        sys.stdout.flush()
+                        driver = uc.Chrome(options=options, use_subprocess=True)
+                except Exception as e:
+                    driver_error = e
+            
+            # Start driver creation in a thread with timeout
+            driver_thread = threading.Thread(target=create_driver_thread, daemon=True)
+            driver_thread.start()
+            driver_thread.join(timeout=60)  # 60 second timeout
+            
+            if driver_thread.is_alive():
+                print("  ERROR: Chrome driver initialization timed out after 60 seconds")
+                print("  This is likely caused by VPN blocking Chrome's network connections")
+                print("  Trying fallback to regular Selenium...")
+                sys.stdout.flush()
+                raise TimeoutError("Chrome driver initialization timed out")
+            
+            if driver_error:
+                raise driver_error
+            
+            if driver is None:
+                raise RuntimeError("Failed to create Chrome driver (unknown error)")
             
             print("  Applying fingerprinting protection...")
             sys.stdout.flush()
@@ -215,6 +415,27 @@ def create_driver(headless=False):
     options.add_argument('--disable-component-update')
     options.add_argument('--no-first-run')
     options.add_argument('--disable-default-apps')
+    options.add_argument('--disable-background-timer-throttling')
+    options.add_argument('--disable-backgrounding-occluded-windows')
+    options.add_argument('--disable-breakpad')
+    options.add_argument('--disable-client-side-phishing-detection')
+    options.add_argument('--disable-extensions')
+    options.add_argument('--disable-features=TranslateUI')
+    options.add_argument('--disable-hang-monitor')
+    options.add_argument('--disable-ipc-flooding-protection')
+    options.add_argument('--disable-popup-blocking')
+    options.add_argument('--disable-prompt-on-repost')
+    options.add_argument('--disable-renderer-backgrounding')
+    options.add_argument('--disable-translate')
+    options.add_argument('--metrics-recording-only')
+    options.add_argument('--safebrowsing-disable-auto-update')
+    options.add_argument('--password-store=basic')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-software-rasterizer')
+    # DNS and network-related flags
+    options.add_argument('--dns-prefetch-disable')
+    options.add_argument('--disable-dns-prefetch')
+    options.add_argument('--disable-features=NetworkService,NetworkServiceInProcess')
     
     # Anti-detection arguments
     options.add_argument('--disable-blink-features=AutomationControlled')
