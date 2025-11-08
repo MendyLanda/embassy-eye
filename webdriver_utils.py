@@ -166,6 +166,14 @@ def create_driver(headless=False):
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
             
+            # Network-disabling flags to prevent hangs (especially with VPN)
+            # These disable Chrome background services that can cause startup delays
+            options.add_argument('--disable-background-networking')
+            options.add_argument('--disable-sync')
+            options.add_argument('--disable-component-update')
+            options.add_argument('--no-first-run')
+            options.add_argument('--disable-default-apps')
+            
             # Additional stealth options
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_argument('--disable-features=IsolateOrigins,site-per-process')
@@ -199,6 +207,14 @@ def create_driver(headless=False):
     print("  Using regular Selenium WebDriver...")
     sys.stdout.flush()
     options = webdriver.ChromeOptions()
+    
+    # Network-disabling flags to prevent hangs (especially with VPN)
+    # These disable Chrome background services that can cause startup delays
+    options.add_argument('--disable-background-networking')
+    options.add_argument('--disable-sync')
+    options.add_argument('--disable-component-update')
+    options.add_argument('--no-first-run')
+    options.add_argument('--disable-default-apps')
     
     # Anti-detection arguments
     options.add_argument('--disable-blink-features=AutomationControlled')
