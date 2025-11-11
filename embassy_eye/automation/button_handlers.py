@@ -2,11 +2,11 @@
 Handler functions for finding and clicking buttons.
 """
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import time
 
-from webdriver_utils import scroll_to_element
+from selenium.webdriver.common.by import By
+
+from .webdriver_utils import scroll_to_element
 
 
 def find_next_button(driver):

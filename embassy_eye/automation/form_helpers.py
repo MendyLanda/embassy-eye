@@ -2,16 +2,21 @@
 Helper functions for filling form fields.
 """
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import NoSuchElementException
-import time
 import random
+import time
 
-from config import DEFAULT_VALUES, FIELD_MAP, DEFAULT_TEXTAREA_VALUE, CHAR_TYPE_DELAY
-from webdriver_utils import scroll_to_element
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import Select
+
+from ..config import (
+    CHAR_TYPE_DELAY,
+    DEFAULT_TEXTAREA_VALUE,
+    DEFAULT_VALUES,
+    FIELD_MAP,
+)
+from .webdriver_utils import scroll_to_element
 
 
 def fill_select_dropdowns(driver, selects):

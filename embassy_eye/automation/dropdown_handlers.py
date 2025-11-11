@@ -2,19 +2,19 @@
 Handlers for dropdown selection logic.
 """
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
 import time
 
-from config import (
-    CONSULATE_DROPDOWN_NAME,
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+
+from ..config import (
     CONSULATE_DROPDOWN_ID,
+    CONSULATE_DROPDOWN_NAME,
     CONSULATE_OPTION_TEXT,
     VISA_TYPE_DROPDOWN_ID,
-    VISA_TYPE_OPTION_TEXT
+    VISA_TYPE_OPTION_TEXT,
 )
-from webdriver_utils import scroll_to_element
+from .webdriver_utils import scroll_to_element
 
 
 def find_dropdown_element(driver, name=None, element_id=None, css_selector=None):

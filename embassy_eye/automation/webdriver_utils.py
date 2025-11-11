@@ -8,6 +8,7 @@ import random
 import json
 import time
 import threading
+import base64
 
 # Disable PyCharm debugger tracing to avoid warnings
 if 'pydevd' in sys.modules:
@@ -25,7 +26,7 @@ try:
 except ImportError:
     UC_AVAILABLE = False
 
-from config import BOOKING_URL, PAGE_LOAD_WAIT
+from ..config import BOOKING_URL, PAGE_LOAD_WAIT
 
 
 # Large pool of realistic, up-to-date user agents (2024-2025)
@@ -683,5 +684,47 @@ def scroll_to_element(driver, element):
     driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
     # Random delay to simulate human scrolling speed
     time.sleep(random.uniform(0.3, 0.7))
+
+
+def get_full_page_screenshot(driver):
+    """Capture a full page screenshot using Chrome DevTools Protocol.
+    
+    Returns PNG bytes of the entire page, not just the viewport.
+    """
+    try:
+        # Get page dimensions using JavaScript
+        page_dimensions = driver.execute_script("""
+            return {
+                width: Math.max(
+                    document.body.scrollWidth,
+                    document.body.offsetWidth,
+                    document.documentElement.clientWidth,
+                    document.documentElement.scrollWidth,
+                    document.documentElement.offsetWidth
+                ),
+                height: Math.max(
+                    document.body.scrollHeight,
+                    document.body.offsetHeight,
+                    document.documentElement.clientHeight,
+                    document.documentElement.scrollHeight,
+                    document.documentElement.offsetHeight
+                )
+            };
+        """)
+        
+        # Use Chrome DevTools Protocol to capture full page screenshot
+        screenshot_result = driver.execute_cdp_cmd('Page.captureScreenshot', {
+            'format': 'png',
+            'captureBeyondViewport': True
+        })
+        
+        # Decode base64 screenshot
+        screenshot_bytes = base64.b64decode(screenshot_result['data'])
+        return screenshot_bytes
+        
+    except Exception as e:
+        print(f"  Warning: Full page screenshot failed ({e}), falling back to viewport screenshot")
+        # Fallback to regular viewport screenshot
+        return driver.get_screenshot_as_png()
 
 

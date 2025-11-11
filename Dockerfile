@@ -64,7 +64,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN useradd -m -u 1000 appuser
 
 # Copy application code
-COPY *.py ./
+COPY embassy_eye ./embassy_eye
+COPY scripts ./scripts
+COPY fill_form.py ./fill_form.py
 
 # Verify Chrome and ChromeDriver installation
 RUN google-chrome --version && chromedriver --version
