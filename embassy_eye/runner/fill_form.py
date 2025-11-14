@@ -4,7 +4,6 @@ Script to fill the booking form on konzinfobooking.mfa.gov.hu
 """
 
 import sys
-import os
 import datetime
 from pathlib import Path
 
@@ -122,21 +121,15 @@ def fill_booking_form():
         
         # If nothing was filled, persist the current page HTML once for offline inspection
         if filled_count == 0:
-            # Use absolute path to avoid permission issues
-            screenshots_dir = Path("screenshots").resolve()
-            html_path = screenshots_dir / "filled_0_fields.html"
+            html_path = Path("screenshots/filled_0_fields.html")
             try:
-                # Ensure directory exists and is writable
-                screenshots_dir.mkdir(parents=True, exist_ok=True)
-                
-                if html_path.exists():
-                    # File already exists, skip saving (original behavior)
-                    print(f"HTML already exists at {html_path}, skipping save")
-                else:
-                    # File doesn't exist, create it
+                if not html_path.exists():
+                    html_path.parent.mkdir(parents=True, exist_ok=True)
                     with html_path.open("w", encoding="utf-8") as f:
                         f.write(driver.page_source)
                     print(f"Saved HTML to {html_path}")
+                else:
+                    print(f"HTML already exists at {html_path}, skipping save")
             except PermissionError as e:
                 print(f"  Warning: Permission denied saving HTML to {html_path}: {e}")
                 print("  This is not critical, continuing...")
@@ -171,10 +164,9 @@ def fill_booking_form():
                 # Save HTML only if it's not a captcha case
                 if special_case != "captcha_required":
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    screenshots_dir = Path("screenshots").resolve()
-                    html_path = screenshots_dir / f"slots_found_{timestamp}.html"
+                    html_path = Path("screenshots") / f"slots_found_{timestamp}.html"
                     try:
-                        screenshots_dir.mkdir(parents=True, exist_ok=True)
+                        html_path.parent.mkdir(parents=True, exist_ok=True)
                         with html_path.open("w", encoding="utf-8") as f:
                             f.write(driver.page_source)
                         print(f"  Saved page HTML to {html_path}")
