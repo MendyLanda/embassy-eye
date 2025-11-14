@@ -18,7 +18,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 try:
     import undetected_chromedriver as uc
@@ -634,14 +634,77 @@ def _apply_fingerprint_protection(driver, profile):
         pass
 
 
-def navigate_to_booking_page(driver):
-    """Navigate to the booking page and wait for form to load."""
+def navigate_to_booking_page(driver, max_retries=3):
+    """Navigate to the booking page and wait for form to load.
+    
+    Args:
+        driver: WebDriver instance
+        max_retries: Maximum number of retry attempts for connection errors (default: 3)
+    
+    Returns:
+        WebDriverWait instance
+        
+    Raises:
+        WebDriverException: If navigation fails after all retries
+    """
     print("Opening https://konzinfobooking.mfa.gov.hu/...")
     
     # Add random delay before navigation to simulate human behavior
     time.sleep(random.uniform(1, 3))
     
-    driver.get(BOOKING_URL)
+    # Retry logic for connection errors
+    for attempt in range(1, max_retries + 1):
+        try:
+            driver.get(BOOKING_URL)
+            # If we get here, navigation succeeded
+            break
+        except WebDriverException as e:
+            error_msg = str(e).lower()
+            
+            # Check if it's a connection-related error
+            is_connection_error = any(
+                err in error_msg 
+                for err in [
+                    'err_connection_closed',
+                    'err_connection_reset',
+                    'err_connection_refused',
+                    'err_connection_timed_out',
+                    'err_network_changed',
+                    'net::err_connection',
+                    'connection closed',
+                    'connection reset',
+                ]
+            )
+            
+            if is_connection_error and attempt < max_retries:
+                # Exponential backoff: 2^attempt seconds, with some randomness
+                wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+                print(f"  Connection error on attempt {attempt}/{max_retries}: {e}")
+                print(f"  Retrying in {wait_time:.1f} seconds...")
+                sys.stdout.flush()
+                time.sleep(wait_time)
+                
+                # Check if driver is still valid before retrying
+                try:
+                    # Try to get current URL to verify driver is still responsive
+                    _ = driver.current_url
+                except Exception:
+                    print("  Driver appears to be in a bad state, cannot retry")
+                    raise
+            else:
+                # Not a connection error, or we've exhausted retries
+                if attempt >= max_retries:
+                    # Last attempt failed, raise with context
+                    if is_connection_error:
+                        raise WebDriverException(
+                            f"Failed to navigate after {max_retries} attempts: {e}"
+                        ) from e
+                    else:
+                        # Non-connection error, raise immediately
+                        raise
+                else:
+                    # Non-connection error on non-final attempt, raise immediately
+                    raise
     
     wait = WebDriverWait(driver, PAGE_LOAD_WAIT)
     print("Waiting for page to load...")
