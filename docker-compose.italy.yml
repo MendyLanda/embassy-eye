@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  embassy-eye-italy:
+    build:
+      context: .
+      dockerfile: Dockerfile.italy
+    container_name: embassy-eye-italy
+    # IMPORTANT: Uncomment the line below if your VPN is running on the host
+    # This allows the container to use the host's VPN connection
+    network_mode: "host"
+    environment:
+      # Telegram configuration - set these in .env file or override here
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_USER_ID=${TELEGRAM_USER_ID}
+      # Italy login credentials
+      - ITALY_EMAIL=${ITALY_EMAIL}
+      - ITALY_PASSWORD=${ITALY_PASSWORD}
+      # Alternative env var names (for compatibility)
+      - LOGIN_EMAIL=${ITALY_EMAIL}
+      - LOGIN_PASSWORD=${ITALY_PASSWORD}
+      # Optional: Italy login URL override
+      - ITALY_LOGIN_URL=${ITALY_LOGIN_URL:-https://prenotami.esteri.it/}
+      # Optional: Proxy configuration
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+    env_file:
+      - .env
+    volumes:
+      # Mount screenshots directory to persist HTML files
+      - ./screenshots:/app/screenshots
+      # Mount project root to persist any state files
+      - .:/app
+    # Uncomment to run on a schedule (requires cron or similar)
+    # restart: unless-stopped
+    # For interactive mode (keeps browser open for inspection)
+    stdin_open: true
+    tty: true
+
