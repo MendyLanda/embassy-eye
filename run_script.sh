@@ -64,8 +64,8 @@ fi
 
 # Check if Docker is available
 if command -v docker &> /dev/null; then
-    # Build Docker image first (if needed, WITHOUT VPN - faster)
-    echo "$(date): Checking if Docker image needs to be built..."
+    # Build Docker images first (if needed, WITHOUT VPN - faster)
+    echo "$(date): Checking if Docker images need to be built..."
     if [ -f "build_docker.sh" ]; then
         bash build_docker.sh
         BUILD_EXIT=$?
@@ -75,31 +75,107 @@ if command -v docker &> /dev/null; then
         fi
     else
         # Fallback: always build if build script doesn't exist
-        echo "$(date): build_docker.sh not found, building Docker image..."
+        echo "$(date): build_docker.sh not found, building Docker images..."
         docker-compose build
     fi
     
-    # Start VPN (AFTER build, BEFORE running container)
+    # Build Italy Docker image if docker-compose.italy.yml exists
+    if [ -f "docker-compose.italy.yml" ]; then
+        # Check if Italy image exists (Docker Compose uses pattern: <project>_<service>)
+        # Try multiple possible naming patterns
+        ITALY_IMAGE_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(embassy-eye-italy|embassy-eye.*italy)" | head -1)
+        
+        if [ -z "$ITALY_IMAGE_EXISTS" ]; then
+            echo "$(date): Italy Docker image not found, building..."
+            docker-compose -f docker-compose.italy.yml build
+        else
+            echo "$(date): Italy Docker image exists ($ITALY_IMAGE_EXISTS), skipping build"
+        fi
+    fi
+    
+    # Start VPN (AFTER build, BEFORE running containers)
     start_vpn
     
-    # Run with Docker (device info randomizes on each run)
-    echo "$(date): Running embassy-eye with Docker (device info will be randomized)..."
+    # Run Hungary script with Docker (device info randomizes on each run)
+    echo "$(date): ========================================"
+    echo "$(date): Running Hungary embassy-eye with Docker..."
+    echo "$(date): ========================================"
     docker-compose run --rm embassy-eye
+    HUNGARY_EXIT=$?
+    
+    if [ $HUNGARY_EXIT -eq 0 ]; then
+        echo "$(date): Hungary script completed successfully"
+    else
+        echo "$(date): Hungary script failed with exit code $HUNGARY_EXIT"
+    fi
+    
+    # Run Italy script with Docker
+    echo "$(date): ========================================"
+    echo "$(date): Running Italy embassy-eye with Docker..."
+    echo "$(date): ========================================"
+    if [ -f "docker-compose.italy.yml" ]; then
+        docker-compose -f docker-compose.italy.yml run --rm embassy-eye-italy
+        ITALY_EXIT=$?
+        
+        if [ $ITALY_EXIT -eq 0 ]; then
+            echo "$(date): Italy script completed successfully"
+        else
+            echo "$(date): Italy script failed with exit code $ITALY_EXIT"
+        fi
+    else
+        echo "$(date): WARNING: docker-compose.italy.yml not found, skipping Italy script"
+        ITALY_EXIT=0
+    fi
+    
+    # Use the worst exit code from both scripts
+    if [ $HUNGARY_EXIT -ne 0 ] || [ $ITALY_EXIT -ne 0 ]; then
+        EXIT_CODE=1
+    else
+        EXIT_CODE=0
+    fi
 else
     # Run directly with Python (requires Python environment setup)
     # For Python, VPN is needed before running
     start_vpn
     
-    echo "$(date): Running embassy-eye with Python..."
-    python3 fill_form.py
+    # Run Hungary script with Python
+    echo "$(date): ========================================"
+    echo "$(date): Running Hungary embassy-eye with Python..."
+    echo "$(date): ========================================"
+    python3 fill_form.py hungary
+    HUNGARY_EXIT=$?
+    
+    if [ $HUNGARY_EXIT -eq 0 ]; then
+        echo "$(date): Hungary script completed successfully"
+    else
+        echo "$(date): Hungary script failed with exit code $HUNGARY_EXIT"
+    fi
+    
+    # Run Italy script with Python
+    echo "$(date): ========================================"
+    echo "$(date): Running Italy embassy-eye with Python..."
+    echo "$(date): ========================================"
+    python3 -m embassy_eye.scrapers.italy.runner
+    ITALY_EXIT=$?
+    
+    if [ $ITALY_EXIT -eq 0 ]; then
+        echo "$(date): Italy script completed successfully"
+    else
+        echo "$(date): Italy script failed with exit code $ITALY_EXIT"
+    fi
+    
+    # Use the worst exit code from both scripts
+    if [ $HUNGARY_EXIT -ne 0 ] || [ $ITALY_EXIT -ne 0 ]; then
+        EXIT_CODE=1
+    else
+        EXIT_CODE=0
+    fi
 fi
 
-EXIT_CODE=$?
-
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "$(date): Script completed successfully"
+    echo "$(date): All scripts completed successfully"
 else
-    echo "$(date): Script failed with exit code $EXIT_CODE"
+    echo "$(date): One or more scripts failed"
 fi
 
 # VPN will be shut down automatically by the trap
