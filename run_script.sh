@@ -43,7 +43,7 @@ start_vpn() {
     fi
 
     # Wait a moment for VPN to establish connection
-    sleep 2
+    sleep 5
 }
 
 get_public_ip() {
@@ -128,6 +128,13 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
+# Determine Italy execution mode (docker vs host python)
+ITALY_USE_DOCKER_DEFAULT="true"
+if [ -n "$ITALY_USE_DOCKER" ]; then
+    ITALY_USE_DOCKER_DEFAULT="$ITALY_USE_DOCKER"
+fi
+ITALY_USE_DOCKER=$(echo "$ITALY_USE_DOCKER_DEFAULT" | tr '[:upper:]' '[:lower:]')
+
 # Check if Docker is available
 if command -v docker &> /dev/null; then
     # Build Docker images first (if needed, WITHOUT VPN - faster)
@@ -145,8 +152,8 @@ if command -v docker &> /dev/null; then
         docker-compose build
     fi
     
-    # Build Italy Docker image if docker-compose.italy.yml exists
-    if [ -f "docker-compose.italy.yml" ]; then
+    # Build Italy Docker image if requested
+    if [ "$ITALY_USE_DOCKER" != "false" ] && [ -f "docker-compose.italy.yml" ]; then
         # Check if Italy image exists (Docker Compose uses pattern: <project>_<service>)
         # Try multiple possible naming patterns
         ITALY_IMAGE_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(embassy-eye-italy|embassy-eye.*italy)" | head -1)
@@ -175,22 +182,29 @@ if command -v docker &> /dev/null; then
         echo "$(date): Hungary script failed with exit code $HUNGARY_EXIT"
     fi
     
-    # Run Italy script with Docker
+    # Run Italy script (Docker or Python)
     echo "$(date): ========================================"
-    echo "$(date): Running Italy embassy-eye with Docker..."
-    echo "$(date): ========================================"
-    if [ -f "docker-compose.italy.yml" ]; then
-        docker-compose -f docker-compose.italy.yml run --rm embassy-eye-italy
-        ITALY_EXIT=$?
-        
-        if [ $ITALY_EXIT -eq 0 ]; then
-            echo "$(date): Italy script completed successfully"
+    if [ "$ITALY_USE_DOCKER" != "false" ]; then
+        echo "$(date): Running Italy embassy-eye with Docker..."
+        echo "$(date): ========================================"
+        if [ -f "docker-compose.italy.yml" ]; then
+            docker-compose -f docker-compose.italy.yml run --rm embassy-eye-italy
+            ITALY_EXIT=$?
         else
-            echo "$(date): Italy script failed with exit code $ITALY_EXIT"
+            echo "$(date): WARNING: docker-compose.italy.yml not found, skipping Italy Docker run"
+            ITALY_EXIT=0
         fi
     else
-        echo "$(date): WARNING: docker-compose.italy.yml not found, skipping Italy script"
-        ITALY_EXIT=0
+        echo "$(date): Running Italy embassy-eye with Python (Docker disabled)..."
+        echo "$(date): ========================================"
+        python3 -m embassy_eye.scrapers.italy.runner
+        ITALY_EXIT=$?
+    fi
+
+    if [ $ITALY_EXIT -eq 0 ]; then
+        echo "$(date): Italy script completed successfully"
+    else
+        echo "$(date): Italy script failed with exit code $ITALY_EXIT"
     fi
     
     # Use the worst exit code from both scripts
