@@ -13,11 +13,18 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-LOGS_DIR = BASE_DIR / "logs"
+PRIMARY_LOG_DIR = Path("logs")
+SECONDARY_LOG_DIR = BASE_DIR / "logs"
 CAPTCHA_FAILURE_TEXT = "hcaptcha has to be checked"
 EMAIL_VERIFICATION_TEXT = "to proceed with your booking, you need to enter the code that is sent to the provided email address"
-CAPTCHA_LOG_PATH = LOGS_DIR / "captcha_failures.log"
-IP_BLOCKED_LOG_PATH = LOGS_DIR / "blocked_ips.log"
+CAPTCHA_LOG_PATHS = [
+    PRIMARY_LOG_DIR / "captcha_failures.log",
+    SECONDARY_LOG_DIR / "captcha_failures.log",
+]
+IP_BLOCKED_LOG_PATHS = [
+    PRIMARY_LOG_DIR / "blocked_ips.log",
+    SECONDARY_LOG_DIR / "blocked_ips.log",
+]
 IP_BLOCKED_REGEX = re.compile(
     r"your ip \((?P<ip>\d{1,3}(?:\.\d{1,3}){3})\) has been blocked", re.IGNORECASE
 )
@@ -248,15 +255,28 @@ def detect_blocked_ip(driver):
     return None
 
 
+def _log_to_paths(paths, message, log_name):
+    """Attempt to write message to first writable path in list."""
+    last_error = None
+    for path in paths:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as log_file:
+                log_file.write(message)
+            print(f"  Logged {log_name} entry to {path}")
+            return
+        except Exception as log_error:
+            last_error = log_error
+            print(f"  Warning: Failed to write {log_name} log at {path}: {log_error}")
+            continue
+    if last_error:
+        print(f"  Warning: Unable to write {log_name} log to any configured path.")
+
+
 def _log_captcha_failure():
     """Append a timestamped log entry for captcha failures."""
-    try:
-        CAPTCHA_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with CAPTCHA_LOG_PATH.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"{timestamp} - hCaptcha modal encountered\n")
-    except Exception as log_error:
-        print(f"  Warning: Failed to write captcha log: {log_error}")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _log_to_paths(CAPTCHA_LOG_PATHS, f"{timestamp} - hCaptcha modal encountered\n", "captcha")
 
 
 def _extract_blocked_ip(text):
@@ -271,12 +291,7 @@ def _extract_blocked_ip(text):
 
 def _log_blocked_ip(ip_address):
     """Append a timestamped log entry for blocked IP notices."""
-    try:
-        IP_BLOCKED_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with IP_BLOCKED_LOG_PATH.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"{timestamp} - {ip_address}\n")
-    except Exception as log_error:
-        print(f"  Warning: Failed to write blocked IP log: {log_error}")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _log_to_paths(IP_BLOCKED_LOG_PATHS, f"{timestamp} - {ip_address}\n", "blocked IP")
 
 
