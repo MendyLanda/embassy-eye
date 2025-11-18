@@ -33,10 +33,10 @@ start_vpn() {
         # Check if VPN is already running
         if sudo wg show "$VPN_NAME" &>/dev/null; then
             echo "$(date): VPN is already running, continuing..."
+            return 0
         else
             echo "$(date): ERROR: Failed to start VPN (exit code $VPN_UP_EXIT)"
-            echo "$(date): Aborting script execution"
-            exit $VPN_UP_EXIT
+            return $VPN_UP_EXIT
         fi
     else
         echo "$(date): VPN started successfully"
@@ -44,6 +44,7 @@ start_vpn() {
 
     # Wait a moment for VPN to establish connection
     sleep 5
+    return 0
 }
 
 get_public_ip() {
@@ -82,7 +83,11 @@ ensure_vpn_ip_allowed() {
             echo "$(date): Restarting VPN to obtain a different IP..."
             shutdown_vpn
             select_random_vpn
-            start_vpn
+            if ! start_vpn; then
+                echo "$(date): WARNING: Failed to restart VPN while rotating IP. Attempt $attempt/$MAX_VPN_IP_ATTEMPTS."
+                attempt=$((attempt + 1))
+                continue
+            fi
             attempt=$((attempt + 1))
             continue
         fi
@@ -96,11 +101,33 @@ ensure_vpn_ip_allowed() {
 
 # Wrapper to start VPN and ensure IP is acceptable
 establish_vpn_connection() {
-    start_vpn
-    if ! ensure_vpn_ip_allowed; then
-        echo "$(date): ERROR: Unable to acquire an allowed IP via VPN."
-        exit 1
-    fi
+    local tried_vpns=()
+    local total_vpns=${#VPN_OPTIONS[@]}
+
+    while [ ${#tried_vpns[@]} -lt $total_vpns ]; do
+        select_random_vpn
+
+        if [[ " ${tried_vpns[*]} " == *" $VPN_NAME "* ]]; then
+            continue
+        fi
+
+        tried_vpns+=("$VPN_NAME")
+
+        if ! start_vpn; then
+            echo "$(date): WARNING: Unable to start VPN ($VPN_NAME). Trying another server..."
+            continue
+        fi
+
+        if ensure_vpn_ip_allowed; then
+            return 0
+        else
+            echo "$(date): WARNING: VPN IP validation failed for $VPN_NAME. Trying another server..."
+            shutdown_vpn
+        fi
+    done
+
+    echo "$(date): ERROR: Unable to establish VPN connection with any configured server."
+    exit 1
 }
 
 # Function to shut down VPN (called on exit)
