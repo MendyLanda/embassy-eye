@@ -13,18 +13,16 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-PRIMARY_LOG_DIR = Path("logs")
-SECONDARY_LOG_DIR = BASE_DIR / "logs"
+LOG_DIR_CANDIDATES = [
+    Path("logs"),
+    Path("screenshots") / "logs",
+    BASE_DIR / "logs",
+    Path("/tmp/embassy-eye/logs"),
+]
 CAPTCHA_FAILURE_TEXT = "hcaptcha has to be checked"
 EMAIL_VERIFICATION_TEXT = "to proceed with your booking, you need to enter the code that is sent to the provided email address"
-CAPTCHA_LOG_PATHS = [
-    PRIMARY_LOG_DIR / "captcha_failures.log",
-    SECONDARY_LOG_DIR / "captcha_failures.log",
-]
-IP_BLOCKED_LOG_PATHS = [
-    PRIMARY_LOG_DIR / "blocked_ips.log",
-    SECONDARY_LOG_DIR / "blocked_ips.log",
-]
+CAPTCHA_LOG_PATHS = [log_dir / "captcha_failures.log" for log_dir in LOG_DIR_CANDIDATES]
+IP_BLOCKED_LOG_PATHS = [log_dir / "blocked_ips.log" for log_dir in LOG_DIR_CANDIDATES]
 IP_BLOCKED_REGEX = re.compile(
     r"your ip \((?P<ip>\d{1,3}(?:\.\d{1,3}){3})\) has been blocked", re.IGNORECASE
 )
