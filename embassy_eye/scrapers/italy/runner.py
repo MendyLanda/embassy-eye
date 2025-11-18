@@ -953,6 +953,27 @@ class ItalyLoginBot:
             Logger.log("✓ New browser tab detected after login attempt. Monitoring for navigation...")
             register_response_listener(page)
             new_tab_page = page
+
+        def find_authenticated_tab() -> Optional[Page]:
+            """Look for an already-open tab that is past the login page."""
+            if not self.context:
+                return None
+            try:
+                for candidate in self.context.pages:
+                    try:
+                        candidate_url = candidate.url
+                    except Exception:
+                        continue
+                    if not candidate_url or candidate_url == "about:blank":
+                        continue
+                    if "/Error" in candidate_url:
+                        continue
+                    if "/Home/Login" in candidate_url:
+                        continue
+                    return candidate
+            except Exception as e:
+                Logger.log(f"⚠ Unable to inspect browser tabs: {e}", "WARN")
+            return None
         
         register_response_listener(self.page)
         
@@ -993,6 +1014,13 @@ class ItalyLoginBot:
                 
                 if login_success:
                     time.sleep(1)
+                    # First, inspect existing tabs for a non-login page
+                    authenticated_page = find_authenticated_tab()
+                    if authenticated_page and authenticated_page is not self.page:
+                        Logger.log(f"✓ Switching automation to authenticated tab: {authenticated_page.url}")
+                        self.page = authenticated_page
+                        self.mouse = MouseSimulator(self.page)
+                        return True, authenticated_page.url
                     try:
                         final_url = self.page.url
                         if "/Error" not in final_url:
