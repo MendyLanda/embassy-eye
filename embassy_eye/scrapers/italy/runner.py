@@ -953,9 +953,9 @@ class ItalyLoginBot:
             Logger.log("✓ New browser tab detected after login attempt. Monitoring for navigation...")
             register_response_listener(page)
             new_tab_page = page
-
+        
         def find_authenticated_tab() -> Optional[Page]:
-            """Look for an already-open tab that is past the login page."""
+            """Look for an already-open tab that navigated beyond the login page."""
             if not self.context:
                 return None
             try:
@@ -974,7 +974,7 @@ class ItalyLoginBot:
             except Exception as e:
                 Logger.log(f"⚠ Unable to inspect browser tabs: {e}", "WARN")
             return None
-        
+
         register_response_listener(self.page)
         
         if self.context:
@@ -988,6 +988,21 @@ class ItalyLoginBot:
                     # Navigation might have occurred
                     Logger.log("✓ Page navigated - login likely succeeded")
                     return True, None
+                
+                authenticated_page = find_authenticated_tab()
+                if authenticated_page and authenticated_page is not self.page:
+                    try:
+                        new_url = authenticated_page.url
+                    except Exception:
+                        new_url = None
+                    register_response_listener(authenticated_page)
+                    self.page = authenticated_page
+                    self.mouse = MouseSimulator(self.page)
+                    if new_url and "/Error" in new_url:
+                        Logger.log(f"✗ Authenticated tab landed on error page: {new_url}", "ERROR")
+                        return False, new_url
+                    Logger.log(f"✓ Switching automation to authenticated tab: {new_url or 'unknown'}")
+                    return True, new_url
                 
                 # Check for error page
                 if "/Error" in current_url:
