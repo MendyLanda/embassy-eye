@@ -25,6 +25,7 @@ from ...automation import (
 )
 from ...notifications import send_result_notification, send_telegram_message
 from ...runner.cooldown import check_and_handle_cooldown, save_captcha_cooldown
+from .config import BOOKING_URL
 
 
 def fill_booking_form():
@@ -175,8 +176,8 @@ def fill_booking_form():
                 print("\n[8/8] Sending notification...")
                 sys.stdout.flush()
                 
-                # Save HTML only if it's not a captcha case
-                if special_case != "captcha_required":
+                # Save HTML only if it's not a captcha or email verification case
+                if special_case not in ("captcha_required", "email_verification"):
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     html_path = Path("screenshots") / f"slots_found_{timestamp}.html"
                     try:
@@ -197,11 +198,12 @@ def fill_booking_form():
                         print("  This is not critical, continuing...")
                         send_telegram_message(error_msg)
                 else:
-                    print("  Skipping HTML save (captcha case)")
+                    case_name = "captcha" if special_case == "captcha_required" else "email verification"
+                    print(f"  Skipping HTML save ({case_name} case)")
                 
                 if special_case in ("captcha_required", "email_verification"):
                     # Send notification without screenshot for special cases
-                    send_result_notification(slots_available, None, special_case=special_case)
+                    send_result_notification(slots_available, None, special_case=special_case, booking_url=BOOKING_URL)
                     case_name = "captcha required" if special_case == "captcha_required" else "email verification"
                     print(f"✓ Notification sent (no screenshot - {case_name} required)")
                     
@@ -212,7 +214,7 @@ def fill_booking_form():
                     print("  Capturing full page screenshot...")
                     sys.stdout.flush()
                     screenshot_bytes = get_full_page_screenshot(driver)
-                    send_result_notification(slots_available, screenshot_bytes, special_case=None)
+                    send_result_notification(slots_available, screenshot_bytes, special_case=None, booking_url=BOOKING_URL)
                     print("✓ Notification sent")
             else:
                 print("  No slots available")
