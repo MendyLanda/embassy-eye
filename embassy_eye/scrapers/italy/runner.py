@@ -907,6 +907,21 @@ class ItalyLoginBot:
         initial_url = self.page.url
         start_time = time.time()
         login_success = False
+        new_tab_page: Optional[Page] = None
+        switched_to_new_tab = False
+        response_listener_pages: List[Page] = []
+        
+        def register_response_listener(target_page: Optional[Page]) -> None:
+            """Attach the shared response handler to the given page once."""
+            if not target_page:
+                return
+            if target_page in response_listener_pages:
+                return
+            try:
+                target_page.on("response", handle_response)
+                response_listener_pages.append(target_page)
+            except Exception as e:
+                Logger.log(f"⚠ Unable to attach response listener to page: {e}", "WARN")
         
         def handle_response(response: Response):
             """Track successful login responses."""
@@ -932,7 +947,17 @@ class ItalyLoginBot:
                 if "/Home" in url or "/Dashboard" in url or "/Account" in url:
                     login_success = True
         
-        self.page.on("response", handle_response)
+        def handle_new_page(page: Page):
+            """Capture new tabs that may contain the authenticated session."""
+            nonlocal new_tab_page
+            Logger.log("✓ New browser tab detected after login attempt. Monitoring for navigation...")
+            register_response_listener(page)
+            new_tab_page = page
+        
+        register_response_listener(self.page)
+        
+        if self.context:
+            self.context.on("page", handle_new_page)
         
         try:
             while (time.time() - start_time) * 1000 < LOGIN_COMPLETE_TIMEOUT:
@@ -992,6 +1017,38 @@ class ItalyLoginBot:
                 
                 if int(time.time() - start_time) % 5 == 0:
                     Logger.log(f"  → Still waiting... ({int(time.time() - start_time)}s elapsed)")
+                
+                if new_tab_page and not switched_to_new_tab:
+                    try:
+                        new_tab_page.wait_for_load_state("domcontentloaded", timeout=PAGE_LOAD_TIMEOUT)
+                    except PlaywrightTimeoutError:
+                        Logger.log("⚠ New tab did not reach DOMContentLoaded within timeout; continuing to wait...", "WARN")
+                    except Exception as e:
+                        Logger.log(f"⚠ Error while waiting for new tab load: {e}", "WARN")
+                    
+                    try:
+                        new_tab_url = new_tab_page.url
+                    except Exception:
+                        new_tab_url = None
+                    
+                    if new_tab_url and new_tab_url != "about:blank":
+                        switched_to_new_tab = True
+                        previous_page = self.page
+                        self.page = new_tab_page
+                        self.mouse = MouseSimulator(self.page)
+                        Logger.log(f"✓ Switching automation to newly opened tab: {new_tab_url}")
+                        
+                        if "/Error" in new_tab_url:
+                            Logger.log(f"✗ Error detected on new tab: {new_tab_url}", "ERROR")
+                            return False, new_tab_url
+                        
+                        try:
+                            if previous_page and previous_page != new_tab_page:
+                                previous_page.close()
+                        except Exception:
+                            pass
+                        
+                        return True, new_tab_url
             
             Logger.log("✗ Timeout waiting for login completion", "ERROR")
             try:
@@ -1001,7 +1058,13 @@ class ItalyLoginBot:
             
         finally:
             try:
-                self.page.remove_listener("response", handle_response)
+                for listener_page in response_listener_pages:
+                    listener_page.remove_listener("response", handle_response)
+            except:
+                pass
+            try:
+                if self.context:
+                    self.context.remove_listener("page", handle_new_page)
             except:
                 pass
     
