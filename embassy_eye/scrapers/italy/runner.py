@@ -1080,9 +1080,11 @@ class ItalyLoginBot:
             
             Logger.log("✗ Timeout waiting for login completion", "ERROR")
             try:
-                return False, self.page.url
+                final_url = self.page.url
             except:
-                return False, None
+                final_url = None
+            self.send_debug_html_snapshot("Login completion timeout")
+            return False, final_url
             
         finally:
             try:
@@ -1487,6 +1489,8 @@ class ItalyLoginBot:
             success, final_url = self.wait_for_login_completion()
             
             if not success:
+                reason = f"Login completion failed (final URL: {final_url})"
+                self.send_debug_html_snapshot(reason)
                 raise LoginError(f"Login did not complete successfully. Final URL: {final_url}")
             
             Logger.log("✓ Login successful!")
