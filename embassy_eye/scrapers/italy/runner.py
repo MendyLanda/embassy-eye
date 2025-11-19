@@ -45,7 +45,6 @@ PASSWORD = os.getenv("LOGIN_PASSWORD") or os.getenv("ITALY_PASSWORD", "")
 
 # Headless mode configuration (for Docker/server environments)
 # Set ITALY_HEADLESS=true or ITALY_INTERACTIVE=false to run in headless mode
-# IMPORTANT: For reCAPTCHA Enterprise, set ITALY_HEADLESS=false if possible
 HEADLESS_MODE = os.getenv("ITALY_HEADLESS", "").lower() in ("true", "1", "yes") or \
                 os.getenv("ITALY_INTERACTIVE", "").lower() in ("false", "0", "no")
 
@@ -425,23 +424,35 @@ class ItalyLoginBot:
         """Setup browser by launching real Google Chrome and connecting via CDP."""
         Logger.log("Setting up real Google Chrome with CDP connection...")
         
-        # Start Xvfb virtual display if in headless mode (better than --headless for reCAPTCHA)
+        # Try to use Xvfb virtual display for headless mode (avoids detection)
+        # This is better than --headless flag because it's harder to detect
         self.xvfb_process = None
+        xvfb_started = False
+        
         if HEADLESS_MODE:
-            Logger.log("Starting Xvfb virtual display for better reCAPTCHA compatibility...")
+            Logger.log("Attempting to use Xvfb virtual display (better than --headless for anti-detection)...")
             try:
                 self.xvfb_process = subprocess.Popen(
                     ['Xvfb', ':99', '-screen', '0', '1920x1080x24', '-ac', '+extension', 'RANDR'],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
-                time.sleep(1)  # Give Xvfb time to start
-                os.environ['DISPLAY'] = ':99'
-                Logger.log("✓ Xvfb virtual display started (DISPLAY=:99)")
+                time.sleep(2)  # Give Xvfb time to start
+                
+                # Check if Xvfb is running
+                if self.xvfb_process.poll() is None:
+                    os.environ['DISPLAY'] = ':99'
+                    Logger.log("✓ Xvfb virtual display started (DISPLAY=:99)")
+                    xvfb_started = True
+                else:
+                    Logger.log("⚠ Xvfb failed to start, will fall back to --headless mode", "WARN")
+                    self.xvfb_process = None
             except FileNotFoundError:
-                Logger.log("⚠ Xvfb not found, falling back to --headless mode", "WARN")
+                Logger.log("⚠ Xvfb not found (install with: apt-get install xvfb or brew install xquartz)", "WARN")
+                Logger.log("⚠ Falling back to --headless mode (may be detected by website)", "WARN")
             except Exception as e:
                 Logger.log(f"⚠ Failed to start Xvfb: {e}, falling back to --headless mode", "WARN")
+                self.xvfb_process = None
         
         # Create temporary user data directory for Chrome
         self.user_data_dir = tempfile.mkdtemp(prefix="chrome_user_data_")
@@ -450,88 +461,35 @@ class ItalyLoginBot:
         proxy_config = ProxyConfig.get_proxy_config()
         
         # Build Chrome launch command
-        # Base flags that work for both local and Docker
         chrome_args = [
             'google-chrome',  # or 'chromium' or 'chrome' depending on system
             '--remote-debugging-port=9222',
             f'--user-data-dir={self.user_data_dir}',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
             '--disable-blink-features=AutomationControlled',
-            # Security flags (required for Docker, safe for local)
-            '--no-sandbox',  # Required in Docker, but reCAPTCHA Enterprise still works
-            '--disable-setuid-sandbox',
-            # Shared memory: use system /dev/shm if available (Docker should provide 2GB)
-            # Only disable if /dev/shm is too small (< 512MB)
-            '--disable-dev-shm-usage',  # Fallback if /dev/shm is small
-            # GPU and rendering flags for reCAPTCHA Enterprise compatibility
-            # Use software rendering (SwiftShader) instead of disabling GPU entirely
-            '--use-gl=swiftshader',  # Software OpenGL for Docker (matches local GPU behavior)
-            '--ignore-gpu-blocklist',  # Allow GPU features even in Docker
-            '--disable-gpu-sandbox',  # Required for GPU in Docker
-            # WebGL and canvas flags (critical for reCAPTCHA Enterprise)
-            '--enable-webgl',
-            '--enable-accelerated-2d-canvas',
-            # Font and rendering flags
-            '--enable-font-antialiasing',
-            '--disable-font-subpixel-positioning',
-            # Network and security flags to match local behavior
-            '--disable-features=IsolateOrigins,site-per-process',  # Reduce fingerprint differences
-            '--disable-site-isolation-trials',  # Improve compatibility
-            # Additional flags to match local Chrome behavior more closely
-            '--disable-features=VizDisplayCompositor',  # Improve rendering compatibility
-            '--enable-features=NetworkService,NetworkServiceInProcess',  # Match local network stack
-            '--lang=it-IT',  # Set language to Italian
-            '--accept-lang=it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',  # Accept-Language header
-            # Additional flags for Docker stability
-            '--disable-background-networking',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-breakpad',
-            '--disable-client-side-phishing-detection',
-            '--disable-component-update',
-            '--disable-default-apps',
-            '--disable-domain-reliability',
-            '--disable-features=AudioServiceOutOfProcess',
-            '--disable-hang-monitor',
-            '--disable-ipc-flooding-protection',
-            '--disable-notifications',
-            '--disable-offer-store-unmasked-wallet-cards',
-            '--disable-popup-blocking',
-            '--disable-print-preview',
-            '--disable-prompt-on-repost',
-            '--disable-renderer-backgrounding',
-            '--disable-sync',
-            '--disable-translate',
-            '--metrics-recording-only',
-            '--no-first-run',
-            '--safebrowsing-disable-auto-update',
-            '--enable-automation',  # Required for CDP
-            '--password-store=basic',
-            '--use-mock-keychain',  # For macOS compatibility in Docker
         ]
         
         # Add headless mode flags if running in Docker/server environment
-        # NOTE: reCAPTCHA Enterprise works better in non-headless mode
-        # We try to use Xvfb virtual display instead of --headless when possible
         if HEADLESS_MODE:
-            if self.xvfb_process and self.xvfb_process.poll() is None:
-                # Xvfb is running - use it instead of --headless (better for reCAPTCHA)
+            if xvfb_started:
+                # Use Xvfb virtual display instead of --headless (harder to detect)
                 chrome_args.extend([
-                    '--display=:99',  # Use Xvfb virtual display
+                    '--display=:99',
                     '--window-size=1920,1080',
-                    '--start-maximized',
                 ])
-                Logger.log("Running Chrome with Xvfb virtual display (better reCAPTCHA compatibility)")
+                Logger.log("Running Chrome with Xvfb virtual display (avoids headless detection)")
             else:
-                # Fallback to headless mode if Xvfb not available
+                # Fallback to --headless if Xvfb not available
                 chrome_args.extend([
-                    '--headless=new',  # New headless mode (better compatibility)
+                    '--headless=new',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
                     '--disable-extensions',
-                    '--window-size=1920,1080',
                 ])
-                Logger.log("Running Chrome in headless mode (for Docker/server)")
-                Logger.log("⚠ WARNING: reCAPTCHA Enterprise may have reduced compatibility in headless mode", "WARN")
+                Logger.log("Running Chrome in headless mode (may be detected by website)", "WARN")
         else:
-            Logger.log("Running Chrome in interactive mode (recommended for reCAPTCHA Enterprise)")
+            Logger.log("Running Chrome in interactive mode")
         
         # Add proxy if configured
         if proxy_config:
@@ -1605,14 +1563,6 @@ class ItalyLoginBot:
         Logger.log("=" * 70)
         Logger.log("Starting Anti-Detection Login Bot")
         Logger.log("=" * 70)
-        
-        # Log headless mode status for debugging
-        if HEADLESS_MODE:
-            Logger.log(f"⚠ Headless mode ENABLED (ITALY_HEADLESS={os.getenv('ITALY_HEADLESS', 'not set')})", "WARN")
-            Logger.log("⚠ For better reCAPTCHA Enterprise compatibility, set ITALY_HEADLESS=false in .env", "WARN")
-            Logger.log("⚠ Will attempt to use Xvfb virtual display instead of --headless flag", "WARN")
-        else:
-            Logger.log("✓ Headless mode DISABLED - using interactive/Xvfb mode (better for reCAPTCHA)")
         
         # Validate credentials
         if not EMAIL or not PASSWORD:
