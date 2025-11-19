@@ -622,6 +622,24 @@ class ItalyLoginBot:
         except PlaywrightTimeoutError:
             Logger.log("⚠ Network idle timeout, continuing anyway...", "WARN")
         
+        # Check if page loaded correctly
+        try:
+            final_url = self.page.url
+            Logger.log(f"Final URL after navigation: {final_url}")
+            
+            # Check for "Unavailable" error
+            if self.check_for_unavailable_error():
+                Logger.log("✗ Page shows 'Unavailable' error after navigation", "ERROR")
+                self.send_debug_html_snapshot("Unavailable error after navigation")
+                raise LoginError("Page shows 'Unavailable' error - cannot proceed")
+            
+            # Verify we're on the login page
+            if "/Home/Login" not in final_url and final_url.rstrip("/") != LOGIN_URL.rstrip("/"):
+                Logger.log(f"⚠ Unexpected URL after navigation: {final_url}", "WARN")
+                Logger.log(f"  Expected login URL: {LOGIN_URL}", "WARN")
+        except Exception as e:
+            Logger.log(f"⚠ Error checking page after navigation: {e}", "WARN")
+        
         # Simulate reading the page
         HumanBehavior.simulate_reading(self.page)
         
@@ -682,8 +700,52 @@ class ItalyLoginBot:
         """Fill login form with human-like behavior."""
         Logger.log("Filling login form...")
         
+        # Check current URL and page state before waiting for form
+        try:
+            current_url = self.page.url
+            Logger.log(f"Current URL: {current_url}")
+            
+            # Check for "Unavailable" error
+            if self.check_for_unavailable_error():
+                Logger.log("✗ Cannot fill login form - page shows 'Unavailable' error", "ERROR")
+                self.send_debug_html_snapshot("Login form not found - Unavailable error")
+                raise LoginError("Page shows 'Unavailable' error - cannot proceed with login")
+            
+            # Check if we're on the login page
+            if "/Home/Login" not in current_url and "/" != current_url.rstrip("/"):
+                Logger.log(f"⚠ Not on login page (URL: {current_url})", "WARN")
+                # Try to navigate to login page
+                Logger.log("Attempting to navigate to login page...")
+                self.navigate_to_login()
+        except Exception as e:
+            Logger.log(f"⚠ Error checking page state: {e}", "WARN")
+        
         # Wait for form to be ready
-        self.page.wait_for_selector(LOGIN_FORM_SELECTOR, timeout=ELEMENT_WAIT_TIMEOUT)
+        try:
+            self.page.wait_for_selector(LOGIN_FORM_SELECTOR, timeout=ELEMENT_WAIT_TIMEOUT)
+        except PlaywrightTimeoutError:
+            # Form not found - save HTML for debugging
+            Logger.log("✗ Login form not found on page", "ERROR")
+            try:
+                current_url = self.page.url
+                page_title = self.page.title()
+                Logger.log(f"  Current URL: {current_url}")
+                Logger.log(f"  Page title: {page_title}")
+                
+                # Check what's actually on the page
+                page_content = self.page.content()
+                if "Unavailable" in page_content:
+                    Logger.log("  Page contains 'Unavailable' text", "ERROR")
+                if "login" in page_content.lower():
+                    Logger.log("  Page contains 'login' text - form selector might be wrong", "WARN")
+                
+                # Save HTML snapshot for debugging
+                self.send_debug_html_snapshot("Login form not found")
+            except Exception as e:
+                Logger.log(f"  Could not inspect page: {e}", "WARN")
+            
+            raise LoginError(f"Login form (#{LOGIN_FORM_SELECTOR}) not found on page. URL: {current_url}")
+        
         HumanBehavior.random_delay(400, 800)
         
         # Fill email field
@@ -1624,6 +1686,20 @@ class ItalyLoginBot:
         try:
             self.setup_browser()
             self.navigate_to_login()
+            
+            # Verify we're on the login page before proceeding
+            try:
+                current_url = self.page.url
+                if "/Home/Login" not in current_url and current_url.rstrip("/") != LOGIN_URL.rstrip("/"):
+                    Logger.log(f"⚠ Warning: Not on expected login page. URL: {current_url}", "WARN")
+                
+                # Check for "Unavailable" error
+                if self.check_for_unavailable_error():
+                    Logger.log("✗ Cannot proceed - page shows 'Unavailable' error", "ERROR")
+                    self.send_debug_html_snapshot("Unavailable error detected after navigation")
+                    raise LoginError("Page shows 'Unavailable' error - cannot proceed with login")
+            except Exception as e:
+                Logger.log(f"⚠ Error verifying page state: {e}", "WARN")
             
             if not self.wait_for_recaptcha_scripts():
                 Logger.log("⚠ reCAPTCHA scripts may not be loaded, continuing anyway...", "WARN")
