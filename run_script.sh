@@ -7,8 +7,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # VPN configuration
-# Available VPNs (commented out for future use: "rs-beg" "hu-bu")
-VPN_OPTIONS=("me-tgd" "ba-sjj" "cy-nic" "hr-zag" "md-chi" "ro-buc" "tr-ist" "ge-tbs" "pl-gdn" "pl-waw" "si-lju" "sk-bts")
+# Available VPNs (ensure matching configs exist in /etc/wireguard)
+VPN_OPTIONS=(
+    "al-tia"  # Albania (Tirana)
+    "ba-sjj"  # Bosnia and Herzegovina (Sarajevo)
+    "bg-sof"  # Bulgaria (Sofia)
+    "cy-nic"  # Cyprus (Nicosia)
+    "ge-tbs"  # Georgia (Tbilisi)
+    "gr-ath"  # Greece (Athens)
+    "hr-zag"  # Croatia (Zagreb)
+    "hu-bud"  # Hungary (Budapest)
+    "md-chi"  # Moldova (Chișinău)
+    "me-tgd"  # Montenegro (Podgorica)
+    "mk-skp"  # North Macedonia (Skopje)
+    "pl-gdn"  # Poland (Gdańsk)
+    "pl-waw"  # Poland (Warsaw)
+    "ro-buc"  # Romania (Bucharest)
+    "rs-beg"  # Serbia (Belgrade)
+    "si-lju"  # Slovenia (Ljubljana)
+    "sk-bts"  # Slovakia (Bratislava)
+    "tr-ist"  # Turkey (Istanbul)
+)
 VPN_NAME=""
 VPN_UP_CMD=""
 VPN_DOWN_CMD=""
@@ -20,18 +39,22 @@ MAX_VPN_IP_ATTEMPTS=5
 get_vpn_country() {
     local vpn_code="$1"
     case "$vpn_code" in
-        rs-beg) echo "Serbia (Belgrade)" ;;
-        hu-bu) echo "Hungary (Budapest)" ;;
+        al-tia) echo "Albania (Tirana)" ;;
         me-tgd) echo "Montenegro (Podgorica)" ;;
         ba-sjj) echo "Bosnia and Herzegovina (Sarajevo)" ;;
+        bg-sof) echo "Bulgaria (Sofia)" ;;
         cy-nic) echo "Cyprus (Nicosia)" ;;
         hr-zag) echo "Croatia (Zagreb)" ;;
+        hu-bud) echo "Hungary (Budapest)" ;;
         md-chi) echo "Moldova (Chișinău)" ;;
+        mk-skp) echo "North Macedonia (Skopje)" ;;
         ro-buc) echo "Romania (Bucharest)" ;;
         tr-ist) echo "Turkey (Istanbul)" ;;
         ge-tbs) echo "Georgia (Tbilisi)" ;;
         pl-gdn) echo "Poland (Gdańsk)" ;;
         pl-waw) echo "Poland (Warsaw)" ;;
+        gr-ath) echo "Greece (Athens)" ;;
+        rs-beg) echo "Serbia (Belgrade)" ;;
         si-lju) echo "Slovenia (Ljubljana)" ;;
         sk-bts) echo "Slovakia (Bratislava)" ;;
         *) echo "Unknown" ;;
