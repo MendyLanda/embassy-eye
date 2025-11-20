@@ -38,8 +38,21 @@ def check_appointment_availability(driver):
     captcha_failure_detected = False
     email_verification_required = False
     blocked_ip = None
+    alert_found = False
+    alert_text_snippet = None
+    page_title = None
+    diagnostic_info = {}
     
     try:
+        # Get page title and URL for diagnostics
+        try:
+            page_title = driver.title
+            current_url = driver.current_url
+            diagnostic_info['url'] = current_url
+            diagnostic_info['title'] = page_title
+        except Exception:
+            pass
+        
         # Method 1: Check page source/text directly for the message
         page_text = driver.page_source.lower()
         body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
@@ -64,7 +77,11 @@ def check_appointment_availability(driver):
                 EC.presence_of_element_located((By.XPATH, "//*[@role='alert']"))
             )
             if alert_element and alert_element.is_displayed():
+                alert_found = True
                 alert_text = alert_element.text.lower()
+                alert_text_snippet = alert_element.text[:200] if alert_element.text else None
+                diagnostic_info['alert_found'] = True
+                diagnostic_info['alert_text'] = alert_text_snippet
                 print(f"  Found alert element with role='alert', text: '{alert_text[:80]}'")
                 if "no appointments" in alert_text:
                     modal_found = True
@@ -77,8 +94,11 @@ def check_appointment_availability(driver):
                     print("  ✓ Email verification modal detected via alert element - slots found!")
         except TimeoutException:
             print("  No alert element with role='alert' found")
+            diagnostic_info['alert_found'] = False
         except Exception as e:
             print(f"  Error finding alert: {e}")
+            diagnostic_info['alert_found'] = False
+            diagnostic_info['alert_error'] = str(e)
         
         # Method 3: Look for red text elements
         if not modal_found:
@@ -96,11 +116,62 @@ def check_appointment_availability(driver):
         if not modal_found and ("no appointments" in body_text or "no appointments available" in body_text):
             print("  Found 'no appointments' text in page body")
             modal_found = _check_modal_divs(driver)
+        
+        # Collect more diagnostic info
+        diagnostic_info['modal_found'] = modal_found
+        diagnostic_info['page_contains_no_slots'] = any(phrase in body_text for phrase in 
+                                                         ["no appointments", "no appointments available", "currently no appointments"])
+        
+        # Check if we're still on the form page (booking data step)
+        diagnostic_info['on_booking_form'] = "booking data" in body_text.lower() or "foglalasi-adatok" in page_text
+        diagnostic_info['on_date_selection'] = "select a date" in body_text.lower() or "idopontvalasztas" in page_text
+        
+        # Check "Select date" button state
+        try:
+            select_date_button = None
+            # Try to find button by text "Select date" or "Dátum"
+            try:
+                select_date_button = driver.find_element(
+                    By.XPATH,
+                    "//button[contains(text(), 'Select date') or contains(text(), 'Dátum')]"
+                )
+            except:
+                # Try to find by button text containing "date"
+                try:
+                    select_date_button = driver.find_element(
+                        By.XPATH,
+                        "//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'date')]"
+                    )
+                except:
+                    pass
+            
+            if select_date_button:
+                is_disabled = not select_date_button.is_enabled() or select_date_button.get_attribute("disabled") is not None
+                button_text = select_date_button.text.strip()
+                diagnostic_info['select_date_button_found'] = True
+                diagnostic_info['select_date_button_disabled'] = is_disabled
+                diagnostic_info['select_date_button_text'] = button_text
+                print(f"  Found 'Select date' button: disabled={is_disabled}, text='{button_text}'")
+            else:
+                diagnostic_info['select_date_button_found'] = False
+                print("  'Select date' button not found")
+        except Exception as e:
+            diagnostic_info['select_date_button_found'] = False
+            diagnostic_info['select_date_button_error'] = str(e)
+            print(f"  Error checking 'Select date' button: {e}")
+        
+        # Get a snippet of visible text for context
+        try:
+            visible_text_snippet = body_text[:300].replace('\n', ' ').strip()
+            diagnostic_info['page_text_snippet'] = visible_text_snippet
+        except Exception:
+            pass
     
     except Exception as e:
         print(f"  Error checking for modal: {e}")
         import traceback
         traceback.print_exc()
+        diagnostic_info['error'] = str(e)
     
     if captcha_failure_detected:
         _log_captcha_failure()
@@ -114,29 +185,29 @@ def check_appointment_availability(driver):
         print("✅ SLOTS FOUND - CAPTCHA REQUIRED ON SITE!")
         print(f"   {current_url}")
         print("="*60)
-        return (True, "captcha_required")  # (slots_available, special_case)
+        return (True, "captcha_required", diagnostic_info)  # (slots_available, special_case, diagnostic_info)
     elif email_verification_required:
         current_url = driver.current_url
         print("✅ SLOTS FOUND - EMAIL VERIFICATION REQUIRED!")
         print(f"   {current_url}")
         print("="*60)
-        return (True, "email_verification")  # (slots_available, special_case)
+        return (True, "email_verification", diagnostic_info)  # (slots_available, special_case, diagnostic_info)
     elif blocked_ip:
         print("❌ ACCESS BLOCKED BY IP RESTRICTION ❌")
         print(f"   Blocked IP: {blocked_ip}")
         print("   Logged to logs/blocked_ips.log")
         print("="*60)
-        return (False, "ip_blocked")
+        return (False, "ip_blocked", diagnostic_info)
     elif modal_found:
         print("⚠️  ALL SLOTS ARE BUSY ⚠️")
         print("="*60)
-        return (False, None)  # No appointments available
+        return (False, None, diagnostic_info)  # No appointments available
     else:
         current_url = driver.current_url
         print("✅ THERE ARE FREE SLOTS!!! GO BY LINK:")
         print(f"   {current_url}")
         print("="*60)
-        return (True, None)  # Appointments available, no special case
+        return (True, None, diagnostic_info)  # Appointments available, no special case
 
 
 def _check_red_text_elements(driver):

@@ -161,12 +161,21 @@ def fill_booking_form():
             sys.stdout.flush()
             result = check_appointment_availability(driver)
             
-            # Handle tuple return (slots_available, special_case) or boolean for backward compatibility
+            # Handle tuple return (slots_available, special_case, diagnostic_info) or boolean for backward compatibility
             if isinstance(result, tuple):
-                slots_available, special_case = result
+                if len(result) == 3:
+                    slots_available, special_case, diagnostic_info = result
+                elif len(result) == 2:
+                    slots_available, special_case = result
+                    diagnostic_info = {}
+                else:
+                    slots_available = result[0]
+                    special_case = None
+                    diagnostic_info = {}
             else:
                 slots_available = result
                 special_case = None
+                diagnostic_info = {}
             
             # Only send notification if slots are found
             if special_case == "ip_blocked":
@@ -185,8 +194,49 @@ def fill_booking_form():
                         with html_path.open("w", encoding="utf-8") as f:
                             f.write(driver.page_source)
                         print(f"  Saved page HTML to {html_path}")
-                        # Send success notification
-                        send_telegram_message(f"✅ HTML saved successfully\n\nFile: {html_path}\nReason: Slots found!")
+                        
+                        # Build diagnostic message
+                        diag_msg_parts = [
+                            f"✅ HTML saved successfully",
+                            f"",
+                            f"File: {html_path}",
+                            f"Reason: Slots found!",
+                            f""
+                        ]
+                        
+                        # Add diagnostic information
+                        if diagnostic_info:
+                            diag_msg_parts.append("📊 Diagnostic Info:")
+                            if diagnostic_info.get('url'):
+                                diag_msg_parts.append(f"URL: {diagnostic_info['url']}")
+                            if diagnostic_info.get('title'):
+                                diag_msg_parts.append(f"Page Title: {diagnostic_info['title']}")
+                            if 'alert_found' in diagnostic_info:
+                                diag_msg_parts.append(f"Alert Element: {'Found' if diagnostic_info['alert_found'] else 'Not Found'}")
+                                if diagnostic_info.get('alert_text'):
+                                    alert_snippet = diagnostic_info['alert_text'][:150]
+                                    diag_msg_parts.append(f"Alert Text: {alert_snippet}...")
+                            if 'modal_found' in diagnostic_info:
+                                diag_msg_parts.append(f"No-Slots Modal: {'Found' if diagnostic_info['modal_found'] else 'Not Found'}")
+                            if 'on_booking_form' in diagnostic_info:
+                                diag_msg_parts.append(f"On Booking Form: {diagnostic_info['on_booking_form']}")
+                            if 'on_date_selection' in diagnostic_info:
+                                diag_msg_parts.append(f"On Date Selection: {diagnostic_info['on_date_selection']}")
+                            if 'select_date_button_found' in diagnostic_info:
+                                if diagnostic_info['select_date_button_found']:
+                                    button_status = "Disabled" if diagnostic_info.get('select_date_button_disabled') else "Enabled"
+                                    button_text = diagnostic_info.get('select_date_button_text', 'N/A')
+                                    diag_msg_parts.append(f"Select Date Button: {button_status} (text: '{button_text}')")
+                                else:
+                                    diag_msg_parts.append(f"Select Date Button: Not Found")
+                            if 'page_contains_no_slots' in diagnostic_info:
+                                diag_msg_parts.append(f"Page Contains 'No Slots': {diagnostic_info['page_contains_no_slots']}")
+                            if diagnostic_info.get('page_text_snippet'):
+                                text_snippet = diagnostic_info['page_text_snippet'][:200]
+                                diag_msg_parts.append(f"Page Text Snippet: {text_snippet}...")
+                        
+                        diag_message = "\n".join(diag_msg_parts)
+                        send_telegram_message(diag_message)
                     except PermissionError as html_err:
                         error_msg = f"❌ Failed to save HTML: Permission denied\n\nFile: {html_path}\nError: {html_err}\n\nThis is not critical, script continues..."
                         print(f"  Warning: Permission denied saving page HTML: {html_err}")
