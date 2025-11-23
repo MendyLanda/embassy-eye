@@ -82,27 +82,11 @@ def fill_and_submit_form(driver, wait):
     print(f"\n[5/8] Summary: Filled {filled_count} field(s)")
     sys.stdout.flush()
     
-    # If nothing was filled, persist the current page HTML once for offline inspection
+    # If nothing was filled, return early with special case
     if filled_count == 0:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        html_path = Path("screenshots") / f"filled_0_fields_{timestamp}.html"
-        try:
-            html_path.parent.mkdir(parents=True, exist_ok=True)
-            with html_path.open("w", encoding="utf-8") as f:
-                f.write(driver.page_source)
-            print(f"Saved HTML to {html_path}")
-            # Send success notification
-            send_telegram_message(f"✅ HTML saved successfully\n\nFile: {html_path}\nReason: No fields were filled (0 fields)")
-        except PermissionError as e:
-            error_msg = f"❌ Failed to save HTML: Permission denied\n\nFile: {html_path}\nError: {e}\n\nThis is not critical, script continues..."
-            print(f"  Warning: Permission denied saving HTML to {html_path}: {e}")
-            print("  This is not critical, continuing...")
-            send_telegram_message(error_msg)
-        except Exception as e:
-            error_msg = f"❌ Failed to save HTML\n\nFile: {html_path}\nError: {e}\n\nThis is not critical, script continues..."
-            print(f"  Warning: Failed to save HTML: {e}")
-            print("  This is not critical, continuing...")
-            send_telegram_message(error_msg)
+        print("  ⚠️  No fields were filled - will trigger retry")
+        sys.stdout.flush()
+        return None, "no_fields_filled", {"filled_count": 0}
     
     # Click the next button
     print("\n[6/8] Clicking next button...")
@@ -228,15 +212,17 @@ def fill_booking_form():
             slots_available, special_case, diagnostic_info = fill_and_submit_form(driver, wait)
             
             # Check if we should retry
-            should_retry = (
-                attempt < max_attempts and
-                slots_available and
-                special_case is None and  # Not captcha, email verification, or IP blocked
-                not diagnostic_info.get('modal_found', False)  # No "no slots" modal found
-            )
+            # Retry if: 0 fields filled OR (slots detected but no modal found)
+            should_retry = False
+            if attempt < max_attempts:
+                if special_case == "no_fields_filled":
+                    should_retry = True
+                    print(f"\n⚠️  No fields were filled. Will retry once by reloading page...")
+                elif slots_available and special_case is None and not diagnostic_info.get('modal_found', False):
+                    should_retry = True
+                    print(f"\n⚠️  Slots detected but no modal found. Will retry once by reloading page...")
             
             if should_retry:
-                print(f"\n⚠️  Slots detected but no modal found. Will retry once by reloading page...")
                 sys.stdout.flush()
                 attempt += 1
                 continue
@@ -248,6 +234,9 @@ def fill_booking_form():
         if special_case == "ip_blocked":
             print("  🚫 IP blocked detected. Please switch network.")
             print("  Details saved to logs/blocked_ips.log")
+        elif special_case == "no_fields_filled":
+            print("  ⚠️  No fields were filled after retry. Ending Hungary scraping for this run.")
+            sys.stdout.flush()
         elif slots_available:
             print("\n[8/8] Sending notification...")
             sys.stdout.flush()
