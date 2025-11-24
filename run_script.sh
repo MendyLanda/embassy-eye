@@ -355,30 +355,11 @@ if command -v docker &> /dev/null; then
         echo "$(date): Hungary script failed with exit code $HUNGARY_EXIT"
     fi
     
-    # Run Italy script (Docker or Python)
+    # Run Italy script (temporarily disabled for cron/SSH usage)
     echo "$(date): ========================================"
-    if [ "$ITALY_USE_DOCKER" != "false" ]; then
-        echo "$(date): Running Italy embassy-eye with Docker..."
-        echo "$(date): ========================================"
-        if [ -f "docker-compose.italy.yml" ]; then
-            docker-compose -f docker-compose.italy.yml run --rm embassy-eye-italy
-            ITALY_EXIT=$?
-        else
-            echo "$(date): WARNING: docker-compose.italy.yml not found, skipping Italy Docker run"
-            ITALY_EXIT=0
-        fi
-    else
-        echo "$(date): Running Italy embassy-eye with Python (Docker disabled)..."
-        echo "$(date): ========================================"
-        python3 -m embassy_eye.scrapers.italy.runner
-        ITALY_EXIT=$?
-    fi
-
-    if [ $ITALY_EXIT -eq 0 ]; then
-        echo "$(date): Italy script completed successfully"
-    else
-        echo "$(date): Italy script failed with exit code $ITALY_EXIT"
-    fi
+    echo "$(date): Italy embassy-eye run is temporarily disabled (cron maintenance)."
+    echo "$(date): ========================================"
+    ITALY_EXIT=0
     
     # Use the worst exit code from both scripts
     if [ $HUNGARY_EXIT -ne 0 ] || [ $ITALY_EXIT -ne 0 ]; then
@@ -404,18 +385,11 @@ else
         echo "$(date): Hungary script failed with exit code $HUNGARY_EXIT"
     fi
     
-    # Run Italy script with Python
+    # Run Italy script with Python (temporarily disabled)
     echo "$(date): ========================================"
-    echo "$(date): Running Italy embassy-eye with Python..."
+    echo "$(date): Italy embassy-eye run is temporarily disabled (cron maintenance)."
     echo "$(date): ========================================"
-    python3 -m embassy_eye.scrapers.italy.runner
-    ITALY_EXIT=$?
-    
-    if [ $ITALY_EXIT -eq 0 ]; then
-        echo "$(date): Italy script completed successfully"
-    else
-        echo "$(date): Italy script failed with exit code $ITALY_EXIT"
-    fi
+    ITALY_EXIT=0
     
     # Use the worst exit code from both scripts
     if [ $HUNGARY_EXIT -ne 0 ] || [ $ITALY_EXIT -ne 0 ]; then
