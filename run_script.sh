@@ -347,7 +347,7 @@ if command -v docker &> /dev/null; then
     echo "$(date): ========================================"
     echo "$(date): Running Hungary embassy-eye with Docker (both locations)..."
     echo "$(date): ========================================"
-    docker-compose run --rm -e HUNGARY_LOCATION=both embassy-eye hungary both
+    docker-compose run --rm embassy-eye python fill_form.py hungary both
     HUNGARY_EXIT=$?
     
     if [ $HUNGARY_EXIT -eq 0 ]; then
