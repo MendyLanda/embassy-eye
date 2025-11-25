@@ -7,21 +7,26 @@ import sys
 import os
 
 # Import country-specific scrapers
-from ..scrapers.hungary.runner import fill_booking_form as fill_hungary_form
+from ..scrapers.hungary.runner import fill_booking_form as fill_hungary_form, fill_booking_form_both_locations
 from ..scrapers.italy.runner import fill_italy_login_form
 
 
-def fill_booking_form(scraper="hungary"):
+def fill_booking_form(scraper="hungary", location="subotica"):
     """
     Fill the booking form using the specified scraper.
     
     Args:
         scraper: The scraper to use ('hungary' or 'italy'). Defaults to 'hungary'.
+        location: For Hungary scraper, either 'subotica', 'belgrade', or 'both'. Defaults to 'subotica'.
     """
     scraper = scraper.lower()
+    location = location.lower()
     
     if scraper == "hungary":
-        fill_hungary_form()
+        if location == "both":
+            fill_booking_form_both_locations()
+        else:
+            fill_hungary_form(location=location)
     elif scraper == "italy":
         fill_italy_login_form()
     else:
@@ -33,10 +38,18 @@ def fill_booking_form(scraper="hungary"):
 if __name__ == "__main__":
     # Allow scraper selection via command line argument or environment variable
     scraper = "hungary"  # Default
+    location = "subotica"  # Default
     
     if len(sys.argv) > 1:
         scraper = sys.argv[1]
     elif os.getenv("SCRAPER"):
         scraper = os.getenv("SCRAPER")
     
-    fill_booking_form(scraper)
+    # Allow location selection for Hungary scraper via second argument or environment variable
+    if scraper == "hungary":
+        if len(sys.argv) > 2:
+            location = sys.argv[2]
+        elif os.getenv("HUNGARY_LOCATION"):
+            location = os.getenv("HUNGARY_LOCATION")
+    
+    fill_booking_form(scraper, location=location)

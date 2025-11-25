@@ -343,10 +343,11 @@ if command -v docker &> /dev/null; then
     establish_vpn_connection
     
     # Run Hungary script with Docker (device info randomizes on each run)
+    # Check both Subotica and Belgrade locations
     echo "$(date): ========================================"
-    echo "$(date): Running Hungary embassy-eye with Docker..."
+    echo "$(date): Running Hungary embassy-eye with Docker (both locations)..."
     echo "$(date): ========================================"
-    docker-compose run --rm embassy-eye
+    docker-compose run --rm -e HUNGARY_LOCATION=both embassy-eye hungary both
     HUNGARY_EXIT=$?
     
     if [ $HUNGARY_EXIT -eq 0 ]; then
@@ -373,10 +374,11 @@ else
     establish_vpn_connection
     
     # Run Hungary script with Python
+    # Check both Subotica and Belgrade locations
     echo "$(date): ========================================"
-    echo "$(date): Running Hungary embassy-eye with Python..."
+    echo "$(date): Running Hungary embassy-eye with Python (both locations)..."
     echo "$(date): ========================================"
-    python3 fill_form.py hungary
+    python3 fill_form.py hungary both
     HUNGARY_EXIT=$?
     
     if [ $HUNGARY_EXIT -eq 0 ]; then

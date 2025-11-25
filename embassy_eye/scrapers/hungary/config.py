@@ -229,11 +229,43 @@ FIELD_MAP = {
 
 # Dropdown IDs and options
 CONSULATE_DROPDOWN_NAME = "ugyfelszolgalat"
-CONSULATE_DROPDOWN_ID = "f05149cd-51b4-417d-912b-9b8e1af999b6"
-CONSULATE_OPTION_TEXT = "Serbia - Subotica"
 
-VISA_TYPE_DROPDOWN_ID = "7c357940-1e4e-4b29-8e87-8b1d09b97d07"
+# Subotica configuration
+SUBTICA_CONSULATE_DROPDOWN_ID = "f05149cd-51b4-417d-912b-9b8e1af999b6"
+SUBTICA_CONSULATE_OPTION_TEXT = "Serbia - Subotica"
+SUBTICA_VISA_TYPE_DROPDOWN_ID = "7c357940-1e4e-4b29-8e87-8b1d09b97d07"
+
+# Belgrade configuration
+BELGRADE_CONSULATE_DROPDOWN_ID = "22c5017f-589b-4e30-8347-cc2226fb4572"
+BELGRADE_CONSULATE_OPTION_TEXT = "Serbia - Belgrade"
+BELGRADE_VISA_TYPE_DROPDOWN_ID = "af7c88ac-ab10-4c60-b911-c2245c0eb025"
+
+# Common visa type option text (same for both locations)
 VISA_TYPE_OPTION_TEXT = "Visa application (Schengen visa- type 'C')"
+
+# Legacy constants for backward compatibility (default to Subotica)
+CONSULATE_DROPDOWN_ID = SUBTICA_CONSULATE_DROPDOWN_ID
+CONSULATE_OPTION_TEXT = SUBTICA_CONSULATE_OPTION_TEXT
+VISA_TYPE_DROPDOWN_ID = SUBTICA_VISA_TYPE_DROPDOWN_ID
+
+
+def get_consulate_config(location="subotica"):
+    """Get consulate configuration based on location."""
+    location_lower = location.lower()
+    if location_lower == "belgrade":
+        return {
+            "consulate_dropdown_id": BELGRADE_CONSULATE_DROPDOWN_ID,
+            "consulate_option_text": BELGRADE_CONSULATE_OPTION_TEXT,
+            "visa_type_dropdown_id": BELGRADE_VISA_TYPE_DROPDOWN_ID,
+            "visa_type_option_text": VISA_TYPE_OPTION_TEXT,
+        }
+    else:  # default to subotica
+        return {
+            "consulate_dropdown_id": SUBTICA_CONSULATE_DROPDOWN_ID,
+            "consulate_option_text": SUBTICA_CONSULATE_OPTION_TEXT,
+            "visa_type_dropdown_id": SUBTICA_VISA_TYPE_DROPDOWN_ID,
+            "visa_type_option_text": VISA_TYPE_OPTION_TEXT,
+        }
 
 # Timing constants (in seconds)
 PAGE_LOAD_WAIT = 20

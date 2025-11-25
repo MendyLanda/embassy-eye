@@ -13,6 +13,7 @@ from ..scrapers.hungary.config import (
     CONSULATE_OPTION_TEXT,
     VISA_TYPE_DROPDOWN_ID,
     VISA_TYPE_OPTION_TEXT,
+    get_consulate_config,
 )
 from .webdriver_utils import scroll_to_element
 
@@ -156,17 +157,21 @@ def find_radio_option_by_text(driver, option_text):
     return None
 
 
-def select_consulate_option(driver):
-    """Select 'Serbia - Subotica' option from the consulate dropdown."""
-    print("Step 1: Opening dropdown and selecting 'Serbia - Subotica'...")
+def select_consulate_option(driver, location="subotica"):
+    """Select consulate option from the dropdown based on location (subotica or belgrade)."""
+    config = get_consulate_config(location)
+    consulate_option_text = config["consulate_option_text"]
+    consulate_dropdown_id = config["consulate_dropdown_id"]
+    
+    print(f"Step 1: Opening dropdown and selecting '{consulate_option_text}'...")
     
     try:
         dropdown = find_dropdown_element(
             driver,
             name=CONSULATE_DROPDOWN_NAME,
-            element_id=CONSULATE_DROPDOWN_ID,
+            element_id=consulate_dropdown_id,
             css_selector="[name*='ugyfelszolgalat'], [name='ugyfelszolgalat']",
-            text_hint=CONSULATE_OPTION_TEXT,
+            text_hint=consulate_option_text,
         )
         
         if dropdown:
@@ -179,18 +184,18 @@ def select_consulate_option(driver):
             time.sleep(1)  # Wait for dropdown to open
             
             # Find and select the radio option
-            radio_option = find_radio_option_by_text(driver, CONSULATE_OPTION_TEXT)
+            radio_option = find_radio_option_by_text(driver, consulate_option_text)
             
             if radio_option:
                 scroll_to_element(driver, radio_option)
                 time.sleep(0.3)
                 
-                print(f"  Found radio option '{CONSULATE_OPTION_TEXT}', clicking it...")
+                print(f"  Found radio option '{consulate_option_text}', clicking it...")
                 driver.execute_script("arguments[0].click();", radio_option)
                 time.sleep(0.5)
-                print(f"  ✓ Selected '{CONSULATE_OPTION_TEXT}'")
+                print(f"  ✓ Selected '{consulate_option_text}'")
             else:
-                print(f"  ✗ Could not find radio option '{CONSULATE_OPTION_TEXT}'")
+                print(f"  ✗ Could not find radio option '{consulate_option_text}'")
                 _list_all_radio_buttons(driver)
         else:
             print("  ✗ Could not find dropdown element")
@@ -460,15 +465,19 @@ def find_save_button(driver, input_element=None):
     return None
 
 
-def select_visa_type_option(driver):
-    """Select visa type option from the second dropdown."""
-    print("\nStep 2: Opening second dropdown and selecting 'Visa application (Schengen visa- type 'C')'...")
+def select_visa_type_option(driver, location="subotica"):
+    """Select visa type option from the second dropdown based on location."""
+    config = get_consulate_config(location)
+    visa_type_dropdown_id = config["visa_type_dropdown_id"]
+    visa_type_option_text = config["visa_type_option_text"]
+    
+    print(f"\nStep 2: Opening second dropdown and selecting '{visa_type_option_text}'...")
     
     try:
         # Find the dropdown trigger and label
         dropdown_trigger, label = find_dropdown_trigger_by_label(
             driver,
-            VISA_TYPE_DROPDOWN_ID,
+            visa_type_dropdown_id,
             label_text_pattern="Visa application (Schengen visa"
         )
         
@@ -484,7 +493,7 @@ def select_visa_type_option(driver):
             print("  Could not find dropdown trigger, will try to find input directly...")
         
         # Find the input element
-        input_element = find_input_by_id_or_label(driver, VISA_TYPE_DROPDOWN_ID, label)
+        input_element = find_input_by_id_or_label(driver, visa_type_dropdown_id, label)
         
         if input_element:
             scroll_to_element(driver, input_element)
@@ -497,15 +506,15 @@ def select_visa_type_option(driver):
             if input_type == "checkbox":
                 if not input_element.is_selected():
                     driver.execute_script("arguments[0].click();", input_element)
-                    print(f"  ✓ Checked checkbox: '{VISA_TYPE_OPTION_TEXT}'")
+                    print(f"  ✓ Checked checkbox: '{visa_type_option_text}'")
                 else:
                     print(f"  ✓ Checkbox already selected")
             elif input_type == "radio":
                 driver.execute_script("arguments[0].click();", input_element)
-                print(f"  ✓ Selected radio: '{VISA_TYPE_OPTION_TEXT}'")
+                print(f"  ✓ Selected radio: '{visa_type_option_text}'")
             else:
                 driver.execute_script("arguments[0].click();", input_element)
-                print(f"  ✓ Clicked element: '{VISA_TYPE_OPTION_TEXT}'")
+                print(f"  ✓ Clicked element: '{visa_type_option_text}'")
             
             time.sleep(0.5)
             
@@ -524,8 +533,8 @@ def select_visa_type_option(driver):
                 print("  ✗ Could not find Save button in dropdown")
                 _list_all_buttons(driver)
         else:
-            print("  ✗ Could not find input element for 'Visa application (Schengen visa- type 'C')'")
-            _debug_visa_type_search(driver)
+            print(f"  ✗ Could not find input element for '{visa_type_option_text}'")
+            _debug_visa_type_search(driver, visa_type_dropdown_id)
     except Exception as e:
         print(f"  ✗ Error selecting second dropdown option: {e}")
         import traceback
@@ -541,12 +550,12 @@ def _list_all_buttons(driver):
             print(f"    Button: text='{btn.text[:50]}', id='{btn.get_attribute('id')}', class='{btn.get_attribute('class')[:50]}'")
 
 
-def _debug_visa_type_search(driver):
+def _debug_visa_type_search(driver, visa_type_dropdown_id):
     """Debug helper for visa type search."""
-    print("  Searching for elements with id '7c357940-1e4e-4b29-8e87-8b1d09b97d07'...")
+    print(f"  Searching for elements with id '{visa_type_dropdown_id}'...")
     elements = driver.find_elements(
         By.XPATH,
-        "//*[@id='7c357940-1e4e-4b29-8e87-8b1d09b97d07'] | //*[contains(@id, '7c357940-1e4e-4b29-8e87-8b1d09b97d07')]"
+        f"//*[@id='{visa_type_dropdown_id}'] | //*[contains(@id, '{visa_type_dropdown_id}')]"
     )
     for elem in elements:
         print(f"    Found: tag='{elem.tag_name}', type='{elem.get_attribute('type')}', id='{elem.get_attribute('id')}'")
