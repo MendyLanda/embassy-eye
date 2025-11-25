@@ -7,6 +7,7 @@ An automated appointment monitoring and booking system for embassy appointment s
 - 🤖 **Automated Form Filling**: Automatically fills booking forms with configurable data
 - 🔍 **Slot Monitoring**: Continuously checks for available appointment slots
 - 📱 **Telegram Notifications**: Sends instant notifications when slots are found
+- 🔔 **Healthcheck Notifications**: Optional separate bot for healthcheck events (slots found, slot busy, IP blocked, page reloaded)
 - 🐳 **Docker Support**: Easy deployment with Docker and Docker Compose
 - 🔒 **VPN Integration**: Built-in WireGuard VPN support for secure connections
 - ⏰ **Cron Scheduling**: Run automatically on a schedule (e.g., every 10 minutes)
@@ -78,11 +79,29 @@ Create a `.env` file in the project root with the following variables:
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 TELEGRAM_USER_ID=your_user_id_here
+HEALTHCHECK_BOT_TOKEN=your_healthcheck_bot_token_here  # Optional
 ```
 
 **Getting your Telegram credentials:**
 - **Bot Token**: Create a bot using [@BotFather](https://t.me/BotFather) on Telegram
 - **User ID**: Get your user ID from [@userinfobot](https://t.me/userinfobot) on Telegram
+- **Healthcheck Bot Token** (optional): Create a separate bot for healthcheck notifications. If not set, healthcheck notifications will be silently skipped.
+
+### Healthcheck Notifications
+
+The system supports an optional healthcheck bot that sends notifications for important events:
+
+- **Slots Found**: Notifies when appointment slots become available (includes country info)
+- **Slot Busy**: Notifies when all slots are busy (includes country info)
+- **IP Blocked**: Notifies when IP is blocked by the embassy site (includes IP address and country)
+- **Page Reloaded**: Notifies when the page is reloaded for form refilling (includes reason if available)
+
+To enable healthcheck notifications:
+1. Create a separate Telegram bot using [@BotFather](https://t.me/BotFather)
+2. Add `HEALTHCHECK_BOT_TOKEN` to your `.env` file
+3. The healthcheck bot will send messages to the same `TELEGRAM_USER_ID`
+
+Healthcheck notifications are sent to the same user ID as regular notifications, allowing you to monitor system health separately from slot availability alerts.
 
 ### Form Configuration
 

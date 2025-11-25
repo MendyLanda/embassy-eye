@@ -24,7 +24,7 @@ from ...automation import (
     select_consulate_option,
     select_visa_type_option,
 )
-from ...notifications import send_result_notification, send_telegram_message
+from ...notifications import send_result_notification, send_telegram_message, send_healthcheck_reloaded_page
 from ...runner.cooldown import check_and_handle_cooldown, save_captcha_cooldown
 from .config import BOOKING_URL, PAGE_LOAD_WAIT
 
@@ -197,6 +197,14 @@ def fill_booking_form():
                 sys.stdout.flush()
                 driver.refresh()
                 time.sleep(3)  # Wait for page to reload
+                
+                # Send healthcheck notification for reloaded page
+                reason = None
+                if special_case == "no_fields_filled":
+                    reason = "No fields were filled"
+                elif slots_available and special_case is None and not diagnostic_info.get('modal_found', False):
+                    reason = "Slots detected but no modal found"
+                send_healthcheck_reloaded_page(reason)
                 
                 # Re-initialize wait after reload
                 from selenium.webdriver.support.ui import WebDriverWait

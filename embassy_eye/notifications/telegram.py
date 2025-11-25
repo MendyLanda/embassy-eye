@@ -11,6 +11,7 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_USER_ID = os.getenv("TELEGRAM_USER_ID")
+HEALTHCHECK_BOT_TOKEN = os.getenv("HEALTHCHECK_BOT_TOKEN")
 
 
 def _ensure_telegram_config() -> bool:
@@ -119,6 +120,10 @@ def send_result_notification(slots_available: bool, screenshot_bytes: bytes = No
         # Don't send notification if no slots found
         return
     
+    # Send healthcheck notification
+    ip_address, country = get_ip_and_country()
+    send_healthcheck_slots_found(country)
+    
     # Base message
     base_message = "✅ SLOTS FOUND!\n\nThere are available appointment slots!"
     
@@ -137,4 +142,121 @@ def send_result_notification(slots_available: bool, screenshot_bytes: bytes = No
     else:
         message = base_message
         send_telegram_message(message, screenshot_bytes)
+
+
+def get_ip_and_country():
+    """
+    Get current public IP address and country.
+    
+    Returns:
+        tuple: (ip_address, country) or (None, None) if failed
+    """
+    try:
+        # Get IP address
+        ip_response = requests.get("https://api.ipify.org", timeout=5)
+        if ip_response.status_code == 200:
+            ip_address = ip_response.text.strip()
+        else:
+            # Fallback to alternative service
+            ip_response = requests.get("https://ifconfig.me", timeout=5)
+            if ip_response.status_code == 200:
+                ip_address = ip_response.text.strip()
+            else:
+                return None, None
+        
+        # Get country from IP using ipapi.co (free, no API key needed)
+        try:
+            country_response = requests.get(f"https://ipapi.co/{ip_address}/country_name/", timeout=5)
+            if country_response.status_code == 200:
+                country = country_response.text.strip()
+                if country and country != "None":
+                    return ip_address, country
+        except:
+            pass
+        
+        # Fallback: try ip-api.com
+        try:
+            country_response = requests.get(f"http://ip-api.com/json/{ip_address}", timeout=5)
+            if country_response.status_code == 200:
+                data = country_response.json()
+                if data.get("status") == "success":
+                    country = data.get("country", "Unknown")
+                    return ip_address, country
+        except:
+            pass
+        
+        # If we got IP but couldn't get country, return IP with Unknown country
+        return ip_address, "Unknown"
+        
+    except Exception as e:
+        print(f"Warning: Failed to get IP and country: {e}")
+        return None, None
+
+
+def send_healthcheck_message(message: str) -> bool:
+    """
+    Send a healthcheck message to the user via healthcheck Telegram bot.
+    
+    Args:
+        message: Text message to send
+    
+    Returns:
+        bool: True if message was sent successfully, False otherwise
+    """
+    if not HEALTHCHECK_BOT_TOKEN:
+        # Silently fail if healthcheck bot is not configured
+        return False
+    
+    if not TELEGRAM_USER_ID:
+        print("Warning: TELEGRAM_USER_ID not set in .env file")
+        return False
+    
+    try:
+        url = f"https://api.telegram.org/bot{HEALTHCHECK_BOT_TOKEN}/sendMessage"
+        data = {
+            'chat_id': TELEGRAM_USER_ID,
+            'text': message
+        }
+        response = requests.post(url, json=data)
+        response.raise_for_status()
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending healthcheck message: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error sending healthcheck message: {e}")
+        return False
+
+
+def send_healthcheck_slots_found(country: str = None):
+    """Send healthcheck notification when slots are found."""
+    message = "🔔 Healthcheck: Slots found"
+    if country:
+        message += f" ({country})"
+    send_healthcheck_message(message)
+
+
+def send_healthcheck_slot_busy(country: str = None):
+    """Send healthcheck notification when all slots are busy."""
+    message = "🔔 Healthcheck: Slot busy"
+    if country:
+        message += f" ({country})"
+    send_healthcheck_message(message)
+
+
+def send_healthcheck_ip_blocked(ip_address: str, country: str = None):
+    """Send healthcheck notification when IP is blocked."""
+    message = f"🔔 Healthcheck: IP blocked\nIP: {ip_address}"
+    if country:
+        message += f"\nCountry: {country}"
+    send_healthcheck_message(message)
+
+
+def send_healthcheck_reloaded_page(reason: str = None):
+    """Send healthcheck notification when page is reloaded for refilling form."""
+    message = "🔔 Healthcheck: Reloaded page for refilling form"
+    if reason:
+        message += f"\nReason: {reason}"
+    send_healthcheck_message(message)
 

@@ -12,6 +12,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from ..notifications.telegram import (
+    send_healthcheck_ip_blocked,
+    send_healthcheck_slot_busy,
+    get_ip_and_country,
+)
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 LOG_DIR_CANDIDATES = [
     Path("logs"),
@@ -197,10 +203,16 @@ def check_appointment_availability(driver):
         print(f"   Blocked IP: {blocked_ip}")
         print("   Logged to logs/blocked_ips.log")
         print("="*60)
+        # Send healthcheck notification for IP blocked
+        _, country = get_ip_and_country()
+        send_healthcheck_ip_blocked(blocked_ip, country)
         return (False, "ip_blocked", diagnostic_info)
     elif modal_found:
         print("⚠️  ALL SLOTS ARE BUSY ⚠️")
         print("="*60)
+        # Send healthcheck notification for slot busy
+        _, country = get_ip_and_country()
+        send_healthcheck_slot_busy(country)
         return (False, None, diagnostic_info)  # No appointments available
     else:
         current_url = driver.current_url
@@ -319,6 +331,9 @@ def detect_blocked_ip(driver):
         print("❌ ACCESS BLOCKED BY IP RESTRICTION ❌")
         print(f"   Detected blocked IP: {blocked_ip}")
         _log_blocked_ip(blocked_ip)
+        # Send healthcheck notification for IP blocked
+        _, country = get_ip_and_country()
+        send_healthcheck_ip_blocked(blocked_ip, country)
         return blocked_ip
 
     return None

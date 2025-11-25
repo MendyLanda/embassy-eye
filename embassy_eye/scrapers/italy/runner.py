@@ -36,7 +36,7 @@ from playwright.sync_api import (
     Response,
     Request,
 )
-from ...notifications import send_telegram_message
+from ...notifications import send_telegram_message, send_healthcheck_slots_found, get_ip_and_country
 
 # Load environment variables
 load_dotenv()
@@ -1870,6 +1870,10 @@ class ItalyLoginBot:
         if self.slots_notified:
             Logger.log("ℹ Slots already reported earlier in this run; skipping duplicate notification.")
             return
+        
+        # Send healthcheck notification
+        _, country = get_ip_and_country()
+        send_healthcheck_slots_found(country)
         
         service_id = href.split("/")[-1] if "/" in href else href
         message = (
