@@ -645,9 +645,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hungary embassy booking form filler")
     parser.add_argument(
         "--location",
-        choices=["subotica", "belgrade", "both"],
+        choices=["subotica", "belgrade", "tel_aviv", "both"],
         default="subotica",
-        help="Location to check slots for: 'subotica', 'belgrade', or 'both' (default: subotica)"
+        help="Location to check slots for: 'subotica', 'belgrade', 'tel_aviv', or 'both' (default: subotica)"
     )
     args = parser.parse_args()
     

@@ -373,13 +373,14 @@ def find_input_by_id_or_label(driver, target_id, label=None):
     """Find an input element by ID or via its label."""
     input_element = None
     
-    # Method 1: Find by id directly
-    try:
-        input_element = driver.find_element(By.ID, target_id)
-        print(f"  Found input element by id '{target_id}'")
-        return input_element
-    except:
-        pass
+    # Method 1: Find by id directly (skip if target_id is None or empty)
+    if target_id:
+        try:
+            input_element = driver.find_element(By.ID, target_id)
+            print(f"  Found input element by id '{target_id}'")
+            return input_element
+        except:
+            pass
     
     # Method 2: Find via label's 'for' attribute
     if not input_element and label:
@@ -395,17 +396,23 @@ def find_input_by_id_or_label(driver, target_id, label=None):
     # Method 3: Find input near the label
     if not input_element and label:
         try:
-            input_element = label.find_element(
-                By.XPATH,
-                f"./preceding-sibling::input | ./following-sibling::input | ../input[@id='{target_id}']"
-            )
+            if target_id:
+                input_element = label.find_element(
+                    By.XPATH,
+                    f"./preceding-sibling::input | ./following-sibling::input | ../input[@id='{target_id}']"
+                )
+            else:
+                input_element = label.find_element(
+                    By.XPATH,
+                    "./preceding-sibling::input | ./following-sibling::input | ../input"
+                )
             print(f"  Found input element near label")
             return input_element
         except:
             pass
     
-    # Method 4: Search for checkbox/radio with this id anywhere
-    if not input_element:
+    # Method 4: Search for checkbox/radio with this id anywhere (only if target_id is provided)
+    if not input_element and target_id:
         try:
             input_element = driver.find_element(
                 By.XPATH,
@@ -473,11 +480,18 @@ def select_visa_type_option(driver, location="subotica"):
     
     print(f"\nStep 2: Opening second dropdown and selecting '{visa_type_option_text}'...")
     
+    # Warn if visa type dropdown ID is not set
+    if not visa_type_dropdown_id:
+        print(f"  ⚠️  Warning: Visa type dropdown ID not configured for location '{location}'")
+        print(f"  The script will try to find the dropdown by label text, but this may fail.")
+        print(f"  Please update the config with the correct visa type dropdown ID.")
+    
     try:
         # Find the dropdown trigger and label
+        # If dropdown_id is None, find_dropdown_trigger_by_label will use label_text_pattern only
         dropdown_trigger, label = find_dropdown_trigger_by_label(
             driver,
-            visa_type_dropdown_id,
+            visa_type_dropdown_id if visa_type_dropdown_id else "",
             label_text_pattern="Visa application (Schengen visa"
         )
         
@@ -493,7 +507,7 @@ def select_visa_type_option(driver, location="subotica"):
             print("  Could not find dropdown trigger, will try to find input directly...")
         
         # Find the input element
-        input_element = find_input_by_id_or_label(driver, visa_type_dropdown_id, label)
+        input_element = find_input_by_id_or_label(driver, visa_type_dropdown_id if visa_type_dropdown_id else "", label)
         
         if input_element:
             scroll_to_element(driver, input_element)
