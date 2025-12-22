@@ -6,6 +6,7 @@ Script to fill the booking form on konzinfobooking.mfa.gov.hu
 import sys
 import time
 import datetime
+import os
 from pathlib import Path
 
 from ...automation import (
@@ -27,6 +28,11 @@ from ...automation import (
 from ...notifications import send_result_notification, send_telegram_message, send_healthcheck_reloaded_page
 from ...runner.cooldown import check_and_handle_cooldown, save_captcha_cooldown
 from .config import BOOKING_URL, PAGE_LOAD_WAIT
+
+# Headless mode configuration (for Docker/server environments)
+# Set HUNGARY_HEADLESS=false or HUNGARY_INTERACTIVE=true to run in visible mode for debugging
+HEADLESS_MODE = os.getenv("HUNGARY_HEADLESS", "").lower() not in ("false", "0", "no") and \
+                os.getenv("HUNGARY_INTERACTIVE", "").lower() not in ("true", "1", "yes")
 
 
 def fill_and_submit_form(driver, wait, location="subotica"):
@@ -156,10 +162,12 @@ def fill_booking_form(location="subotica"):
     
     # Initialize Chrome driver
     print("\n[1/8] Initializing Chrome driver...")
+    if not HEADLESS_MODE:
+        print("  Running in INTERACTIVE mode (browser will be visible)")
     sys.stdout.flush()  # Force output to appear immediately
     
     try:
-        driver = create_driver(headless=True)
+        driver = create_driver(headless=HEADLESS_MODE)
         print("✓ Chrome driver initialized successfully")
         sys.stdout.flush()
     except Exception as e:
@@ -348,6 +356,11 @@ def fill_booking_form(location="subotica"):
         sys.stdout.flush()
         
         # Keep browser open for inspection (only if not headless)
+        if not HEADLESS_MODE:
+            print("\n[Debug] Browser will remain open for 60 seconds for inspection...")
+            print("  Press Ctrl+C to close early, or wait for automatic close.")
+            sys.stdout.flush()
+            time.sleep(60)  # Keep browser open for 60 seconds in interactive mode
         # Since we're in headless mode, skip the inspection delay
         
     except Exception as e:
@@ -390,10 +403,12 @@ def fill_booking_form_both_locations():
     
     # Initialize Chrome driver
     print("\n[1/8] Initializing Chrome driver...")
+    if not HEADLESS_MODE:
+        print("  Running in INTERACTIVE mode (browser will be visible)")
     sys.stdout.flush()
     
     try:
-        driver = create_driver(headless=True)
+        driver = create_driver(headless=HEADLESS_MODE)
         print("✓ Chrome driver initialized successfully")
         sys.stdout.flush()
     except Exception as e:
@@ -420,7 +435,7 @@ def fill_booking_form_both_locations():
         # Reinitialize driver for Belgrade
         print("\n[1/8] Reinitializing Chrome driver for Belgrade...")
         sys.stdout.flush()
-        driver = create_driver(headless=True)
+        driver = create_driver(headless=HEADLESS_MODE)
         print("✓ Chrome driver reinitialized successfully")
         sys.stdout.flush()
         

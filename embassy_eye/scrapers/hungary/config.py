@@ -243,7 +243,7 @@ BELGRADE_VISA_TYPE_DROPDOWN_ID = "af7c88ac-ab10-4c60-b911-c2245c0eb025"
 # Tel Aviv configuration
 TEL_AVIV_CONSULATE_DROPDOWN_ID = None  # Optional - will find by name if None
 TEL_AVIV_CONSULATE_OPTION_TEXT = "Israel - Tel Aviv"
-TEL_AVIV_VISA_TYPE_DROPDOWN_ID = "423eaea5-2acc-4911-aa7c-093c368f63c9"
+TEL_AVIV_VISA_TYPE_DROPDOWN_ID = "a4d09106-3331-4459-be2b-c0c6151ea13e"
 
 # Common visa type option text (same for all locations)
 VISA_TYPE_OPTION_TEXT = "Visa application (Schengen visa- type 'C')"

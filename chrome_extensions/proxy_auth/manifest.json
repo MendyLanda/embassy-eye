@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Proxy Authentication",
+  "version": "1.0",
+  "description": "Automatically handles HTTP proxy authentication",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "proxy"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

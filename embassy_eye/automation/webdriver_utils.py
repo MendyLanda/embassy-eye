@@ -16,6 +16,7 @@ if 'pydevd' in sys.modules:
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -370,9 +371,82 @@ def create_driver(headless=False):
             
             # Configure proxy if available
             proxy_server = os.getenv("PROXY_SERVER", "").strip()
+            proxy_username = os.getenv("PROXY_USERNAME", "").strip()
+            proxy_password = os.getenv("PROXY_PASSWORD", "").strip()
+            
             if proxy_server:
-                options.add_argument(f'--proxy-server={proxy_server}')
-                print(f"  Using proxy: {proxy_server}")
+                # Load proxy authentication extension if credentials are provided
+                if proxy_username and proxy_password:
+                    # Create dynamic extension with credentials baked in
+                    # Based on: https://stackoverflow.com/questions/17082425/running-selenium-webdriver-with-a-proxy-in-python
+                    import tempfile
+                    from urllib.parse import urlparse
+                    
+                    parsed = urlparse(proxy_server)
+                    proxy_host = parsed.hostname
+                    proxy_port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+                    
+                    # Extension manifest (Manifest V3)
+                    manifest_json = '''{
+    "manifest_version": 3,
+    "name": "Proxy Auth",
+    "version": "1.0",
+    "permissions": ["proxy", "webRequest", "webRequestAuthProvider"],
+    "host_permissions": ["<all_urls>"],
+    "background": {"service_worker": "background.js"}
+}'''
+                    
+                    # Background script with credentials hardcoded
+                    background_js = f'''
+// Configure proxy settings
+chrome.proxy.settings.set({{
+    value: {{
+        mode: "fixed_servers",
+        rules: {{
+            singleProxy: {{
+                host: "{proxy_host}",
+                port: {proxy_port},
+                scheme: "{parsed.scheme or 'http'}"
+            }},
+            bypassList: ["localhost", "127.0.0.1"]
+        }}
+    }},
+    scope: "regular"
+}}, function() {{}});
+
+// Supply proxy auth credentials when prompted
+chrome.webRequest.onAuthRequired.addListener(
+    function(details) {{
+        return {{
+            authCredentials: {{
+                username: "{proxy_username}",
+                password: "{proxy_password}"
+            }}
+        }};
+    }},
+    {{urls: ["<all_urls>"]}},
+    ["blocking"]
+);
+'''
+                    
+                    # Create temporary extension directory
+                    ext_dir = tempfile.mkdtemp(prefix="proxy_auth_ext_")
+                    
+                    with open(os.path.join(ext_dir, "manifest.json"), 'w') as f:
+                        f.write(manifest_json)
+                    
+                    with open(os.path.join(ext_dir, "background.js"), 'w') as f:
+                        f.write(background_js)
+                    
+                    options.add_argument(f'--load-extension={ext_dir}')
+                    print(f"  Created dynamic proxy authentication extension")
+                    print(f"  Using proxy: {parsed.scheme}://{proxy_username}:***@{proxy_host}:{proxy_port}")
+                    
+                    # Note: Don't set --proxy-server when using chrome.proxy API
+                    # The extension handles proxy configuration
+                else:
+                    options.add_argument(f'--proxy-server={proxy_server}')
+                    print(f"  Using proxy: {proxy_server}")
                 sys.stdout.flush()
             
             print("  Creating Chrome driver instance...")
@@ -435,6 +509,11 @@ def create_driver(headless=False):
             # Apply comprehensive fingerprinting protection via CDP
             _apply_fingerprint_protection(driver, profile)
             
+            # Proxy authentication is handled by the extension with hardcoded credentials
+            if proxy_server and proxy_username and proxy_password:
+                print("  ✓ Proxy authentication handled by extension")
+                sys.stdout.flush()
+            
             return driver
         except Exception as e:
             print(f"  Warning: undetected-chromedriver failed ({e}), falling back to regular selenium with stealth")
@@ -495,9 +574,70 @@ def create_driver(headless=False):
     
     # Configure proxy if available
     proxy_server = os.getenv("PROXY_SERVER", "").strip()
+    proxy_username = os.getenv("PROXY_USERNAME", "").strip()
+    proxy_password = os.getenv("PROXY_PASSWORD", "").strip()
+    
     if proxy_server:
-        options.add_argument(f'--proxy-server={proxy_server}')
-        print(f"  Using proxy: {proxy_server}")
+        if proxy_username and proxy_password:
+            # Create dynamic extension with credentials baked in (same as UC path)
+            import tempfile
+            from urllib.parse import urlparse
+            
+            parsed = urlparse(proxy_server)
+            proxy_host = parsed.hostname
+            proxy_port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+            
+            manifest_json = '''{
+    "manifest_version": 3,
+    "name": "Proxy Auth",
+    "version": "1.0",
+    "permissions": ["proxy", "webRequest", "webRequestAuthProvider"],
+    "host_permissions": ["<all_urls>"],
+    "background": {"service_worker": "background.js"}
+}'''
+            
+            background_js = f'''
+chrome.proxy.settings.set({{
+    value: {{
+        mode: "fixed_servers",
+        rules: {{
+            singleProxy: {{
+                host: "{proxy_host}",
+                port: {proxy_port},
+                scheme: "{parsed.scheme or 'http'}"
+            }},
+            bypassList: ["localhost", "127.0.0.1"]
+        }}
+    }},
+    scope: "regular"
+}}, function() {{}});
+
+chrome.webRequest.onAuthRequired.addListener(
+    function(details) {{
+        return {{
+            authCredentials: {{
+                username: "{proxy_username}",
+                password: "{proxy_password}"
+            }}
+        }};
+    }},
+    {{urls: ["<all_urls>"]}},
+    ["blocking"]
+);
+'''
+            
+            ext_dir = tempfile.mkdtemp(prefix="proxy_auth_ext_")
+            with open(os.path.join(ext_dir, "manifest.json"), 'w') as f:
+                f.write(manifest_json)
+            with open(os.path.join(ext_dir, "background.js"), 'w') as f:
+                f.write(background_js)
+            
+            options.add_argument(f'--load-extension={ext_dir}')
+            print(f"  Created dynamic proxy authentication extension")
+            print(f"  Using proxy: {parsed.scheme}://{proxy_username}:***@{proxy_host}:{proxy_port}")
+        else:
+            options.add_argument(f'--proxy-server={proxy_server}')
+            print(f"  Using proxy: {proxy_server}")
         sys.stdout.flush()
     
     print("  Creating Chrome driver instance...")

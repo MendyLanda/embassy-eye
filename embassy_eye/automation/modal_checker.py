@@ -70,7 +70,8 @@ def check_appointment_availability(driver, location=None):
         
         if any(phrase in page_text or phrase in body_text for phrase in 
                ["no appointments available", "currently no appointments"]):
-            print("  Found 'no appointments' text in page")
+            print("  Found 'no appointments' text in page - setting modal_found=True")
+            modal_found = True  # This is the definitive signal - no appointments available
         if CAPTCHA_FAILURE_TEXT in page_text or CAPTCHA_FAILURE_TEXT in body_text:
             captcha_failure_detected = True
             print("  ✓ hCaptcha modal detected - slots found but captcha required on site!")
