@@ -27,6 +27,7 @@ except ImportError:
     UC_AVAILABLE = False
 
 from ..scrapers.hungary.config import BOOKING_URL, PAGE_LOAD_WAIT
+import os
 
 
 # Large pool of realistic, up-to-date user agents (2024-2025)
@@ -367,6 +368,13 @@ def create_driver(headless=False):
             # Use random window size from profile
             options.add_argument(f'--window-size={profile["width"]},{profile["height"]}')
             
+            # Configure proxy if available
+            proxy_server = os.getenv("PROXY_SERVER", "").strip()
+            if proxy_server:
+                options.add_argument(f'--proxy-server={proxy_server}')
+                print(f"  Using proxy: {proxy_server}")
+                sys.stdout.flush()
+            
             print("  Creating Chrome driver instance...")
             sys.stdout.flush()
             
@@ -484,6 +492,13 @@ def create_driver(headless=False):
     
     # Use random window size from profile
     options.add_argument(f'--window-size={profile["width"]},{profile["height"]}')
+    
+    # Configure proxy if available
+    proxy_server = os.getenv("PROXY_SERVER", "").strip()
+    if proxy_server:
+        options.add_argument(f'--proxy-server={proxy_server}')
+        print(f"  Using proxy: {proxy_server}")
+        sys.stdout.flush()
     
     print("  Creating Chrome driver instance...")
     sys.stdout.flush()

@@ -9,7 +9,7 @@ An automated appointment monitoring and booking system for embassy appointment s
 - 📱 **Telegram Notifications**: Sends instant notifications when slots are found
 - 🔔 **Healthcheck Notifications**: Optional separate bot for healthcheck events (slots found, slot busy, IP blocked, page reloaded)
 - 🐳 **Docker Support**: Easy deployment with Docker and Docker Compose
-- 🔒 **VPN Integration**: Built-in WireGuard VPN support for secure connections
+- 🔒 **VPN/Proxy Support**: Built-in WireGuard VPN support or proxy configuration for secure connections
 - ⏰ **Cron Scheduling**: Run automatically on a schedule (e.g., every 10 minutes)
 - 🎭 **Undetected Automation**: Uses undetected-chromedriver to avoid detection
 - 📸 **Screenshot Capture**: Automatically captures and sends screenshots when slots are found
@@ -122,6 +122,18 @@ sudo visudo
 # Add this line (replace 'youruser' with your username):
 youruser ALL=(ALL) NOPASSWD: /usr/bin/wg-quick
 ```
+
+### Proxy Configuration
+
+Instead of using a VPN, you can configure a proxy server for network routing:
+
+```env
+PROXY_SERVER=http://proxy.example.com:8080
+PROXY_USERNAME=your_username
+PROXY_PASSWORD=your_password
+```
+
+The proxy will be used by both Hungary and Italy scrapers.
 
 ## Usage
 

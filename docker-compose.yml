@@ -11,6 +11,10 @@ services:
       # Telegram configuration - set these in .env file or override here
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_USER_ID=${TELEGRAM_USER_ID}
+      # Optional: Proxy configuration
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
     env_file:
       - .env
     volumes:
