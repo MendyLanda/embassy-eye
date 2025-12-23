@@ -1,5 +1,7 @@
 # Use Python 3.11 slim as base image
-FROM python:3.11-slim
+# Force amd64 platform since Google Chrome only provides amd64 binaries
+# This works on both Mac (via emulation) and Linux servers (native)
+FROM --platform=linux/amd64 python:3.11-slim
 
 # Set working directory
 WORKDIR /app
@@ -32,6 +34,7 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     libu2f-udev \
     libvulkan1 \
+    proxychains4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome using modern method (without deprecated apt-key)
@@ -68,6 +71,10 @@ COPY embassy_eye ./embassy_eye
 COPY scripts ./scripts
 COPY fill_form.py ./fill_form.py
 
+# Copy proxychains configuration script
+COPY scripts/setup_proxychains.sh ./scripts/setup_proxychains.sh
+RUN chmod +x ./scripts/setup_proxychains.sh
+
 # Verify Chrome and ChromeDriver installation
 RUN google-chrome --version && chromedriver --version
 
@@ -82,6 +89,7 @@ ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 ENV PATH="/usr/local/bin:${PATH}"
 
-# Run the script
-CMD ["python", "fill_form.py"]
+# Run the script with proxychains4 if proxy is configured, otherwise run directly
+# The setup script will check for PROXY_SERVER and configure proxychains accordingly
+CMD ["./scripts/setup_proxychains.sh"]
 
