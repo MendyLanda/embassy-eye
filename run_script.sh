@@ -312,7 +312,7 @@ run_hungary_with_ip_retry() {
         
         # Run the script (Docker or Python based on what was called)
         if [ "$1" = "docker" ]; then
-            docker-compose run --rm embassy-eye python fill_form.py hungary both
+            docker compose run --rm embassy-eye python fill_form.py hungary both
             hungary_exit=$?
         else
             python3 fill_form.py hungary both
@@ -402,7 +402,7 @@ if command -v docker &> /dev/null; then
     else
         # Fallback: always build if build script doesn't exist
         echo "$(date): build_docker.sh not found, building Docker images..."
-        docker-compose build
+        docker compose build
     fi
     
     # Build Italy Docker image if requested
@@ -413,7 +413,7 @@ if command -v docker &> /dev/null; then
         
         if [ -z "$ITALY_IMAGE_EXISTS" ]; then
             echo "$(date): Italy Docker image not found, building..."
-            docker-compose -f docker-compose.italy.yml build
+            docker compose -f docker-compose.italy.yml build
         else
             echo "$(date): Italy Docker image exists ($ITALY_IMAGE_EXISTS), skipping build"
         fi

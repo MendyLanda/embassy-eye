@@ -64,7 +64,7 @@ fi
 # Build if needed
 if [ "$REBUILD_NEEDED" = true ]; then
     echo "$(date): Building Docker image (this may take a few minutes)..."
-    docker-compose build
+    docker compose build
     
     BUILD_EXIT=$?
     if [ $BUILD_EXIT -eq 0 ]; then
