@@ -147,21 +147,55 @@ def send_result_notification(slots_available: bool, screenshot_bytes: bytes = No
         send_telegram_message(message, screenshot_bytes)
 
 
+def _get_proxy_config():
+    """
+    Build proxy configuration from environment variables.
+    
+    Returns:
+        dict: Proxy configuration for requests, or None if not configured
+    """
+    proxy_server = os.getenv("PROXY_SERVER")
+    if not proxy_server:
+        return None
+    
+    proxy_username = os.getenv("PROXY_USERNAME")
+    proxy_password = os.getenv("PROXY_PASSWORD")
+    
+    if proxy_username and proxy_password:
+        # Parse the proxy URL and inject credentials
+        # Format: http://username:password@host:port
+        if "://" in proxy_server:
+            protocol, rest = proxy_server.split("://", 1)
+            proxy_url = f"{protocol}://{proxy_username}:{proxy_password}@{rest}"
+        else:
+            proxy_url = f"http://{proxy_username}:{proxy_password}@{proxy_server}"
+    else:
+        proxy_url = proxy_server
+    
+    return {
+        "http": proxy_url,
+        "https": proxy_url
+    }
+
+
 def get_ip_and_country():
     """
     Get current public IP address and country.
+    Uses proxy if configured in environment variables.
     
     Returns:
         tuple: (ip_address, country) or (None, None) if failed
     """
+    proxies = _get_proxy_config()
+    
     try:
-        # Get IP address
-        ip_response = requests.get("https://api.ipify.org", timeout=5)
+        # Get IP address (through proxy if configured)
+        ip_response = requests.get("https://api.ipify.org", timeout=10, proxies=proxies)
         if ip_response.status_code == 200:
             ip_address = ip_response.text.strip()
         else:
             # Fallback to alternative service
-            ip_response = requests.get("https://ifconfig.me", timeout=5)
+            ip_response = requests.get("https://ifconfig.me", timeout=10, proxies=proxies)
             if ip_response.status_code == 200:
                 ip_address = ip_response.text.strip()
             else:
@@ -169,7 +203,7 @@ def get_ip_and_country():
         
         # Get country from IP using ipapi.co (free, no API key needed)
         try:
-            country_response = requests.get(f"https://ipapi.co/{ip_address}/country_name/", timeout=5)
+            country_response = requests.get(f"https://ipapi.co/{ip_address}/country_name/", timeout=10, proxies=proxies)
             if country_response.status_code == 200:
                 country = country_response.text.strip()
                 if country and country != "None":
@@ -179,7 +213,7 @@ def get_ip_and_country():
         
         # Fallback: try ip-api.com
         try:
-            country_response = requests.get(f"http://ip-api.com/json/{ip_address}", timeout=5)
+            country_response = requests.get(f"http://ip-api.com/json/{ip_address}", timeout=10, proxies=proxies)
             if country_response.status_code == 200:
                 data = country_response.json()
                 if data.get("status") == "success":
