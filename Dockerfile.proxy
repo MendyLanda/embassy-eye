@@ -1,0 +1,10 @@
+# Custom proxy service Dockerfile
+# Uses 3proxy to forward traffic to external SOCKS5 proxy
+FROM --platform=linux/amd64 3proxy/3proxy:latest
+
+# Copy proxy configuration generator script (uses /bin/sh, compatible with minimal images)
+COPY scripts/generate_proxy_config.sh /usr/local/bin/generate_proxy_config.sh
+RUN chmod +x /usr/local/bin/generate_proxy_config.sh
+
+# Set entrypoint to generate config and start 3proxy
+ENTRYPOINT ["/usr/local/bin/generate_proxy_config.sh"]

@@ -56,7 +56,8 @@ BLOCKED_USERS_FILE = Path(
 HEADLESS_MODE = os.getenv("ITALY_HEADLESS", "").lower() in ("true", "1", "yes") or \
                 os.getenv("ITALY_INTERACTIVE", "").lower() in ("false", "0", "no")
 
-# Proxy configuration (optional)
+# Proxy configuration (required - proxychains handles proxy at system level)
+# These are used for browser-level proxy config as fallback
 PROXY_SERVER = os.getenv("PROXY_SERVER", "")  # e.g., "http://proxy.example.com:8080"
 PROXY_USERNAME = os.getenv("PROXY_USERNAME", "")
 PROXY_PASSWORD = os.getenv("PROXY_PASSWORD", "")

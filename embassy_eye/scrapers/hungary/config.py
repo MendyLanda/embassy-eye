@@ -248,13 +248,13 @@ TEL_AVIV_VISA_TYPE_DROPDOWN_ID = "a4d09106-3331-4459-be2b-c0c6151ea13e"
 # Common visa type option text (same for all locations)
 VISA_TYPE_OPTION_TEXT = "Visa application (Schengen visa- type 'C')"
 
-# Legacy constants for backward compatibility (default to Subotica)
+# Legacy constants for backward compatibility (default to Tel Aviv)
 CONSULATE_DROPDOWN_ID = SUBTICA_CONSULATE_DROPDOWN_ID
 CONSULATE_OPTION_TEXT = SUBTICA_CONSULATE_OPTION_TEXT
 VISA_TYPE_DROPDOWN_ID = SUBTICA_VISA_TYPE_DROPDOWN_ID
 
 
-def get_consulate_config(location="subotica"):
+def get_consulate_config(location="tel_aviv"):
     """Get consulate configuration based on location."""
     location_lower = location.lower()
     if location_lower == "belgrade":

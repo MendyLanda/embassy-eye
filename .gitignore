@@ -219,3 +219,6 @@ launchd.error.log
 
 # Docker build cache
 .docker_build_cache
+
+# Proxychains configuration (contains sensitive proxy credentials, generated at runtime)
+.proxychains/

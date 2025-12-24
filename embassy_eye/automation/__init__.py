@@ -15,6 +15,7 @@ from .modal_checker import check_appointment_availability, detect_blocked_ip
 from .webdriver_utils import (
     create_driver,
     get_full_page_screenshot,
+    get_ip_from_chrome,
     inspect_form_fields,
     navigate_to_booking_page,
     scroll_to_element,
@@ -32,6 +33,7 @@ __all__ = [
     "fill_textareas",
     "find_next_button",
     "get_full_page_screenshot",
+    "get_ip_from_chrome",
     "inspect_form_fields",
     "navigate_to_booking_page",
     "scroll_to_element",

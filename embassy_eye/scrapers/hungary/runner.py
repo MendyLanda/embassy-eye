@@ -20,6 +20,7 @@ from ...automation import (
     fill_select_dropdowns,
     fill_textareas,
     get_full_page_screenshot,
+    get_ip_from_chrome,
     inspect_form_fields,
     navigate_to_booking_page,
     select_consulate_option,
@@ -35,7 +36,7 @@ HEADLESS_MODE = os.getenv("HUNGARY_HEADLESS", "").lower() not in ("false", "0", 
                 os.getenv("HUNGARY_INTERACTIVE", "").lower() not in ("true", "1", "yes")
 
 
-def fill_and_submit_form(driver, wait, location="subotica"):
+def fill_and_submit_form(driver, wait, location="tel_aviv", chrome_ip=None):
     """Fill the booking form and submit it. Returns (slots_available, special_case, diagnostic_info)."""
     # Inspect form fields
     print("\n[3/8] Inspecting form fields...")
@@ -108,7 +109,7 @@ def fill_and_submit_form(driver, wait, location="subotica"):
         # Check for appointment availability
         print("\n[7/8] Checking appointment availability...")
         sys.stdout.flush()
-        result = check_appointment_availability(driver, location=location)
+        result = check_appointment_availability(driver, location=location, chrome_ip=chrome_ip)
         
         # Handle tuple return (slots_available, special_case, diagnostic_info) or boolean for backward compatibility
         if isinstance(result, tuple):
@@ -128,7 +129,7 @@ def fill_and_submit_form(driver, wait, location="subotica"):
     else:
         print("  Next button not found or not clickable")
         sys.stdout.flush()
-        blocked_ip = detect_blocked_ip(driver)
+        blocked_ip = detect_blocked_ip(driver, chrome_ip=chrome_ip)
         if blocked_ip:
             print("  🚫 IP blocked detected after failing to find next button.")
             print("  Details saved to logs/blocked_ips.log")
@@ -137,11 +138,11 @@ def fill_and_submit_form(driver, wait, location="subotica"):
     return slots_available, special_case, diagnostic_info
 
 
-def fill_booking_form(location="subotica"):
+def fill_booking_form(location="tel_aviv"):
     """Fill the booking form with acceptable values and click save (without submitting)
     
     Args:
-        location: Either 'subotica' or 'belgrade' to select the appropriate consulate
+        location: Either 'subotica', 'belgrade', or 'tel_aviv' to select the appropriate consulate
     """
     location_display = location.capitalize()
     print("=" * 60)
@@ -177,6 +178,21 @@ def fill_booking_form(location="subotica"):
         sys.stdout.flush()
         return
     
+    # Get IP address from Chrome (to track which IP is actually being used)
+    chrome_ip = None
+    try:
+        print("\n[1.5/8] Detecting IP address from Chrome...")
+        sys.stdout.flush()
+        chrome_ip = get_ip_from_chrome(driver)
+        if chrome_ip:
+            print(f"✓ IP detected: {chrome_ip}")
+        else:
+            print("  Warning: Could not detect IP from Chrome")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"  Warning: Failed to get IP from Chrome: {e}")
+        sys.stdout.flush()
+    
     try:
         # Navigate to the booking page
         print("\n[2/8] Navigating to booking page...")
@@ -186,7 +202,7 @@ def fill_booking_form(location="subotica"):
         sys.stdout.flush()
 
         # Immediately check if access is blocked by IP
-        blocked_ip = detect_blocked_ip(driver)
+        blocked_ip = detect_blocked_ip(driver, chrome_ip=chrome_ip)
         if blocked_ip:
             print("  Detected blocked IP right after page load. Aborting run.")
             print("  Exit code 2 will trigger VPN IP rotation and retry.")
@@ -218,21 +234,21 @@ def fill_booking_form(location="subotica"):
                     reason = "No fields were filled"
                 elif slots_available and special_case is None and not diagnostic_info.get('modal_found', False):
                     reason = "Slots detected but no modal found"
-                send_healthcheck_reloaded_page(reason, location=location)
+                send_healthcheck_reloaded_page(reason, location=location, ip_address=chrome_ip)
                 
                 # Re-initialize wait after reload
                 from selenium.webdriver.support.ui import WebDriverWait
                 wait = WebDriverWait(driver, PAGE_LOAD_WAIT)
                 
                 # Check if IP is blocked after reload
-                blocked_ip = detect_blocked_ip(driver)
+                blocked_ip = detect_blocked_ip(driver, chrome_ip=chrome_ip)
                 if blocked_ip:
                     print("  Detected blocked IP after page reload. Aborting run.")
                     print("  Exit code 2 will trigger VPN IP rotation and retry.")
                     sys.exit(2)  # Special exit code for IP blocked - triggers VPN rotation
             
             # Fill and submit the form
-            slots_available, special_case, diagnostic_info = fill_and_submit_form(driver, wait, location=location)
+            slots_available, special_case, diagnostic_info = fill_and_submit_form(driver, wait, location=location, chrome_ip=chrome_ip)
             
             # Check if IP was blocked during form submission
             if special_case == "ip_blocked":
@@ -338,7 +354,7 @@ def fill_booking_form(location="subotica"):
             
             if special_case in ("captcha_required", "email_verification"):
                 # Send notification without screenshot for special cases
-                send_result_notification(slots_available, None, special_case=special_case, booking_url=BOOKING_URL, location=location)
+                send_result_notification(slots_available, None, special_case=special_case, booking_url=BOOKING_URL, location=location, chrome_ip=chrome_ip)
                 case_name = "captcha required" if special_case == "captcha_required" else "email verification"
                 print(f"✓ Notification sent (no screenshot - {case_name} required)")
                 
@@ -349,7 +365,7 @@ def fill_booking_form(location="subotica"):
                 print("  Capturing full page screenshot...")
                 sys.stdout.flush()
                 screenshot_bytes = get_full_page_screenshot(driver)
-                send_result_notification(slots_available, screenshot_bytes, special_case=None, booking_url=BOOKING_URL, location=location)
+                send_result_notification(slots_available, screenshot_bytes, special_case=None, booking_url=BOOKING_URL, location=location, chrome_ip=chrome_ip)
                 print("✓ Notification sent")
         else:
             print("  No slots available")
@@ -418,12 +434,27 @@ def fill_booking_form_both_locations():
         sys.stdout.flush()
         return
     
+    # Get IP address from Chrome (to track which IP is actually being used)
+    chrome_ip = None
+    try:
+        print("\n[1.5/8] Detecting IP address from Chrome...")
+        sys.stdout.flush()
+        chrome_ip = get_ip_from_chrome(driver)
+        if chrome_ip:
+            print(f"✓ IP detected: {chrome_ip}")
+        else:
+            print("  Warning: Could not detect IP from Chrome")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"  Warning: Failed to get IP from Chrome: {e}")
+        sys.stdout.flush()
+    
     try:
         # Run Subotica first
         print("\n" + "=" * 60)
         print("CHECKING SUBOTICA")
         print("=" * 60)
-        _run_location_check(driver, "subotica")
+        _run_location_check(driver, "subotica", chrome_ip)
         
         # Reload browser for Belgrade check
         print("\n" + "=" * 60)
@@ -443,7 +474,7 @@ def fill_booking_form_both_locations():
         print("\n" + "=" * 60)
         print("CHECKING BELGRADE")
         print("=" * 60)
-        _run_location_check(driver, "belgrade")
+        _run_location_check(driver, "belgrade", chrome_ip)
         
     except Exception as e:
         print(f"\n✗ Error occurred: {e}")
@@ -465,7 +496,7 @@ def fill_booking_form_both_locations():
         sys.stdout.flush()
 
 
-def _run_location_check(driver, location):
+def _run_location_check(driver, location, chrome_ip=None):
     """Helper function to run a single location check."""
     location_display = location.capitalize()
     
@@ -478,7 +509,7 @@ def _run_location_check(driver, location):
         sys.stdout.flush()
 
         # Immediately check if access is blocked by IP
-        blocked_ip = detect_blocked_ip(driver)
+        blocked_ip = detect_blocked_ip(driver, chrome_ip=chrome_ip)
         if blocked_ip:
             print("  Detected blocked IP right after page load. Aborting run.")
             print("  Exit code 2 will trigger VPN IP rotation and retry.")
@@ -510,21 +541,21 @@ def _run_location_check(driver, location):
                     reason = "No fields were filled"
                 elif slots_available and special_case is None and not diagnostic_info.get('modal_found', False):
                     reason = "Slots detected but no modal found"
-                send_healthcheck_reloaded_page(reason, location=location)
+                send_healthcheck_reloaded_page(reason, location=location, ip_address=chrome_ip)
                 
                 # Re-initialize wait after reload
                 from selenium.webdriver.support.ui import WebDriverWait
                 wait = WebDriverWait(driver, PAGE_LOAD_WAIT)
                 
                 # Check if IP is blocked after reload
-                blocked_ip = detect_blocked_ip(driver)
+                blocked_ip = detect_blocked_ip(driver, chrome_ip=chrome_ip)
                 if blocked_ip:
                     print("  Detected blocked IP after page reload. Aborting run.")
                     print("  Exit code 2 will trigger VPN IP rotation and retry.")
                     sys.exit(2)  # Special exit code for IP blocked - triggers VPN rotation
             
             # Fill and submit the form
-            slots_available, special_case, diagnostic_info = fill_and_submit_form(driver, wait, location=location)
+            slots_available, special_case, diagnostic_info = fill_and_submit_form(driver, wait, location=location, chrome_ip=chrome_ip)
             
             # Check if IP was blocked during form submission
             if special_case == "ip_blocked":
@@ -631,7 +662,7 @@ def _run_location_check(driver, location):
             
             if special_case in ("captcha_required", "email_verification"):
                 # Send notification without screenshot for special cases
-                send_result_notification(slots_available, None, special_case=special_case, booking_url=BOOKING_URL, location=location)
+                send_result_notification(slots_available, None, special_case=special_case, booking_url=BOOKING_URL, location=location, chrome_ip=chrome_ip)
                 case_name = "captcha required" if special_case == "captcha_required" else "email verification"
                 print(f"✓ Notification sent (no screenshot - {case_name} required)")
                 
@@ -642,7 +673,7 @@ def _run_location_check(driver, location):
                 print("  Capturing full page screenshot...")
                 sys.stdout.flush()
                 screenshot_bytes = get_full_page_screenshot(driver)
-                send_result_notification(slots_available, screenshot_bytes, special_case=None, booking_url=BOOKING_URL, location=location)
+                send_result_notification(slots_available, screenshot_bytes, special_case=None, booking_url=BOOKING_URL, location=location, chrome_ip=chrome_ip)
                 print("✓ Notification sent")
         else:
             print("  No slots available")
@@ -661,8 +692,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--location",
         choices=["subotica", "belgrade", "tel_aviv", "both"],
-        default="subotica",
-        help="Location to check slots for: 'subotica', 'belgrade', 'tel_aviv', or 'both' (default: subotica)"
+        default="tel_aviv",
+        help="Location to check slots for: 'subotica', 'belgrade', 'tel_aviv', or 'both' (default: tel_aviv)"
     )
     args = parser.parse_args()
     

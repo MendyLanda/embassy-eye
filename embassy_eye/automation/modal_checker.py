@@ -34,12 +34,13 @@ IP_BLOCKED_REGEX = re.compile(
 )
 
 
-def check_appointment_availability(driver, location=None):
+def check_appointment_availability(driver, location=None, chrome_ip=None):
     """Check for appointment availability after clicking the next button.
     
     Args:
         driver: Selenium WebDriver instance
         location: Optional location string (e.g., "subotica", "belgrade") for notifications
+        chrome_ip: Optional IP address detected from Chrome browser
     """
     print("\n=== Waiting for modal to appear (if any) ===")
     time.sleep(6)  # Initial wait
@@ -211,14 +212,14 @@ def check_appointment_availability(driver, location=None):
         print("="*60)
         # Send healthcheck notification for IP blocked
         _, country = get_ip_and_country()
-        send_healthcheck_ip_blocked(blocked_ip, country, location=location)
+        send_healthcheck_ip_blocked(blocked_ip, country, location=location, chrome_ip=chrome_ip)
         return (False, "ip_blocked", diagnostic_info)
     elif modal_found:
         print("⚠️  ALL SLOTS ARE BUSY ⚠️")
         print("="*60)
         # Send healthcheck notification for slot busy
         _, country = get_ip_and_country()
-        send_healthcheck_slot_busy(country, location=location)
+        send_healthcheck_slot_busy(country, location=location, ip_address=chrome_ip)
         return (False, None, diagnostic_info)  # No appointments available
     else:
         current_url = driver.current_url
@@ -321,8 +322,13 @@ def _check_email_verification_modal(driver):
     return False
 
 
-def detect_blocked_ip(driver):
-    """Detect blocked IP message anywhere on the page and log it."""
+def detect_blocked_ip(driver, chrome_ip=None):
+    """Detect blocked IP message anywhere on the page and log it.
+    
+    Args:
+        driver: Selenium WebDriver instance
+        chrome_ip: Optional IP address detected from Chrome browser
+    """
     try:
         page_text = driver.page_source.lower()
     except Exception:
@@ -339,7 +345,7 @@ def detect_blocked_ip(driver):
         _log_blocked_ip(blocked_ip)
         # Send healthcheck notification for IP blocked
         _, country = get_ip_and_country()
-        send_healthcheck_ip_blocked(blocked_ip, country)
+        send_healthcheck_ip_blocked(blocked_ip, country, chrome_ip=chrome_ip)
         return blocked_ip
 
     return None

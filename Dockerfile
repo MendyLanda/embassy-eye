@@ -34,7 +34,6 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     libu2f-udev \
     libvulkan1 \
-    proxychains4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome using modern method (without deprecated apt-key)
@@ -71,9 +70,7 @@ COPY embassy_eye ./embassy_eye
 COPY scripts ./scripts
 COPY fill_form.py ./fill_form.py
 
-# Copy proxychains configuration script
-COPY scripts/setup_proxychains.sh ./scripts/setup_proxychains.sh
-RUN chmod +x ./scripts/setup_proxychains.sh
+# No proxy setup script needed - using Docker proxy service instead
 
 # Verify Chrome and ChromeDriver installation
 RUN google-chrome --version && chromedriver --version
@@ -89,7 +86,8 @@ ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 ENV PATH="/usr/local/bin:${PATH}"
 
-# Run the script with proxychains4 if proxy is configured, otherwise run directly
-# The setup script will check for PROXY_SERVER and configure proxychains accordingly
-CMD ["./scripts/setup_proxychains.sh"]
+# Run the application directly (proxy is handled by Docker proxy service)
+# Use ENTRYPOINT so arguments passed via docker compose run are forwarded to the script
+ENTRYPOINT ["python", "fill_form.py"]
+CMD []
 

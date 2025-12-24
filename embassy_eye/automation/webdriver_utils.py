@@ -147,19 +147,17 @@ def get_random_device_profile():
 
 
 def test_network_connectivity():
-    """Test network connectivity to diagnose VPN/Docker issues."""
-    print("\n  === Network Connectivity Test ===")
+    """Test DNS resolution to diagnose VPN/Docker issues."""
+    print("\n  === DNS Test ===")
     sys.stdout.flush()
     
     import socket
-    import subprocess
-    import shutil
     
     tests_passed = 0
     tests_failed = 0
     
-    # Test 1: DNS resolution
-    print("  [1] Testing DNS resolution...")
+    # Test DNS resolution
+    print("  Testing DNS resolution...")
     sys.stdout.flush()
     try:
         socket.gethostbyname('google.com')
@@ -170,128 +168,11 @@ def test_network_connectivity():
         tests_failed += 1
     sys.stdout.flush()
     
-    # Test 2: Get public IP address via api.ipify.org
-    print("  [2] Getting public IP address...")
-    sys.stdout.flush()
-    ip_address = None
-    try:
-        import urllib.request
-        import ssl
-        context = ssl.create_default_context()
-        response = urllib.request.urlopen('https://api.ipify.org/', timeout=10, context=context)
-        if response.getcode() == 200:
-            ip_address = response.read().decode('utf-8').strip()
-            print(f"    ✓ Public IP: {ip_address}")
-            tests_passed += 1
-            
-            # Send IP address to Telegram
-            try:
-                from ..notifications.telegram import send_telegram_message
-                telegram_message = f"🌐 Network Connectivity Test\n\nPublic IP Address: {ip_address}"
-                send_telegram_message(telegram_message)
-                print("    ✓ IP address sent to Telegram")
-            except Exception as telegram_error:
-                print(f"    ⚠ Failed to send IP to Telegram: {telegram_error}")
-                # Don't fail the test if Telegram send fails
-        else:
-            print(f"    ✗ Failed to get IP (status: {response.getcode()})")
-            tests_failed += 1
-    except Exception as e:
-        print(f"    ✗ Failed to get IP address: {e}")
-        tests_failed += 1
-    sys.stdout.flush()
-    
-    # Test 3: Target website connectivity
-    print(f"  [3] Testing connectivity to target website ({BOOKING_URL})...")
-    sys.stdout.flush()
-    try:
-        import ssl
-        context = ssl.create_default_context()
-        response = urllib.request.urlopen(BOOKING_URL, timeout=10, context=context)
-        print(f"    ✓ Target website: OK (status: {response.getcode()})")
-        tests_passed += 1
-    except Exception as e:
-        print(f"    ✗ Target website: FAILED ({e})")
-        tests_failed += 1
-    sys.stdout.flush()
-    
-    # Test 4: Check VPN interface (if WireGuard is running)
-    print("  [4] Checking for VPN interface...")
-    sys.stdout.flush()
-    try:
-        # Check if 'ip' command is available
-        ip_cmd = shutil.which('ip')
-        if not ip_cmd:
-            print("    ⚠ 'ip' command not available (likely running in Docker container)")
-            print("    ⚠ Skipping VPN interface check")
-            tests_passed += 1  # Not critical
-        else:
-            result = subprocess.run(['ip', 'link', 'show'], capture_output=True, text=True, timeout=5, check=False)
-            if result.returncode == 0:
-                if 'wg' in result.stdout.lower() or 'wireguard' in result.stdout.lower():
-                    print("    ✓ VPN interface detected")
-                    tests_passed += 1
-                else:
-                    print("    ⚠ VPN interface not found (might be using host network)")
-                    tests_passed += 1  # Not a failure, just info
-            else:
-                print(f"    ⚠ Could not check VPN interface: command returned {result.returncode}")
-                tests_passed += 1  # Not critical
-    except FileNotFoundError:
-        print("    ⚠ 'ip' command not found (likely running in Docker container)")
-        tests_passed += 1  # Not critical
-    except Exception as e:
-        print(f"    ⚠ Could not check VPN interface: {e}")
-        tests_passed += 1  # Not critical
-    
-    # Test 5: Check routing table
-    print("  [5] Checking routing table...")
-    sys.stdout.flush()
-    try:
-        # Check if 'ip' command is available
-        ip_cmd = shutil.which('ip')
-        if not ip_cmd:
-            print("    ⚠ 'ip' command not available (likely running in Docker container)")
-            print("    ⚠ Skipping routing table check")
-            tests_passed += 1  # Not critical
-        else:
-            result = subprocess.run(['ip', 'route'], capture_output=True, text=True, timeout=5, check=False)
-            if result.returncode == 0:
-                routes = result.stdout.splitlines()
-                print(f"    Routing info: {len(routes)} routes found")
-                # Show first few routes
-                for route in routes[:3]:
-                    print(f"      - {route}")
-                tests_passed += 1
-            else:
-                print(f"    ⚠ Could not check routing: command returned {result.returncode}")
-                tests_passed += 1  # Not critical
-    except FileNotFoundError:
-        print("    ⚠ 'ip' command not found (likely running in Docker container)")
-        tests_passed += 1  # Not critical
-    except Exception as e:
-        print(f"    ⚠ Could not check routing: {e}")
-        tests_passed += 1  # Not critical
-    sys.stdout.flush()
-    
-    # Test 6: Check if we can resolve Chrome-related domains
-    print("  [6] Testing Chrome-related domain resolution...")
-    sys.stdout.flush()
-    chrome_domains = ['dl.google.com', 'clients2.google.com', 'update.googleapis.com']
-    for domain in chrome_domains:
-        try:
-            socket.gethostbyname(domain)
-            print(f"    ✓ {domain}: resolvable")
-        except Exception as e:
-            print(f"    ✗ {domain}: NOT resolvable ({e})")
-    sys.stdout.flush()
-    
     print(f"\n  === Test Summary: {tests_passed} passed, {tests_failed} failed ===")
     sys.stdout.flush()
     
     if tests_failed > 0:
-        print("  ⚠ WARNING: Some connectivity tests failed. This might cause Chrome to hang.")
-        print("  ⚠ VPN might be blocking or routing traffic incorrectly.")
+        print("  ⚠ WARNING: DNS test failed. This might cause Chrome to hang.")
         sys.stdout.flush()
     
     return tests_failed == 0
@@ -374,28 +255,19 @@ def create_driver(headless=False):
             options.add_argument(f'--window-size={profile["width"]},{profile["height"]}')
             
             # Configure proxy if available
-            # Skip browser-level proxy if proxychains (system-level proxy) is being used
-            use_system_proxy = os.getenv("USE_SYSTEM_PROXY", "").lower() in ("true", "1", "yes")
-            if not use_system_proxy:
-                # Check if we're running under proxychains by checking parent process
-                try:
-                    import psutil
-                    current_process = psutil.Process()
-                    parent = current_process.parent()
-                    if parent and 'proxychains' in parent.name().lower():
-                        use_system_proxy = True
-                except ImportError:
-                    # psutil not available, continue with browser-level proxy
-                    pass
-                except (AttributeError, psutil.NoSuchProcess, psutil.AccessDenied):
-                    # psutil available but can't check process, continue with browser-level proxy
-                    pass
+            # Use HTTP_PROXY/HTTPS_PROXY environment variables (set by Docker proxy service)
+            http_proxy = os.getenv("HTTP_PROXY", "").strip()
+            https_proxy = os.getenv("HTTPS_PROXY", "").strip()
+            proxy_server = http_proxy or https_proxy
             
-            proxy_server = os.getenv("PROXY_SERVER", "").strip()
+            # Fallback to PROXY_SERVER if HTTP_PROXY is not set (for backward compatibility)
+            if not proxy_server:
+                proxy_server = os.getenv("PROXY_SERVER", "").strip()
+            
             proxy_username = os.getenv("PROXY_USERNAME", "").strip()
             proxy_password = os.getenv("PROXY_PASSWORD", "").strip()
             
-            if proxy_server and not use_system_proxy:
+            if proxy_server:
                 # Load proxy authentication extension if credentials are provided
                 if proxy_username and proxy_password:
                     # Create dynamic extension with credentials baked in
@@ -531,12 +403,10 @@ chrome.webRequest.onAuthRequired.addListener(
             _apply_fingerprint_protection(driver, profile)
             
             # Proxy authentication is handled by the extension with hardcoded credentials
-            if proxy_server and proxy_username and proxy_password and not use_system_proxy:
+            if proxy_server and proxy_username and proxy_password:
                 print("  ✓ Proxy authentication handled by extension")
                 sys.stdout.flush()
-            elif use_system_proxy and proxy_server:
-                print("  ✓ Using system-level proxy (proxychains4) - skipping browser-level proxy configuration")
-                sys.stdout.flush()
+
             
             return driver
         except Exception as e:
@@ -597,28 +467,19 @@ chrome.webRequest.onAuthRequired.addListener(
     options.add_argument(f'--window-size={profile["width"]},{profile["height"]}')
     
     # Configure proxy if available
-    # Skip browser-level proxy if proxychains (system-level proxy) is being used
-    use_system_proxy = os.getenv("USE_SYSTEM_PROXY", "").lower() in ("true", "1", "yes")
-    if not use_system_proxy:
-        # Check if we're running under proxychains by checking parent process
-        try:
-            import psutil
-            current_process = psutil.Process()
-            parent = current_process.parent()
-            if parent and 'proxychains' in parent.name().lower():
-                use_system_proxy = True
-        except ImportError:
-            # psutil not available, continue with browser-level proxy
-            pass
-        except (AttributeError, psutil.NoSuchProcess, psutil.AccessDenied):
-            # psutil available but can't check process, continue with browser-level proxy
-            pass
+    # Use HTTP_PROXY/HTTPS_PROXY environment variables (set by Docker proxy service)
+    http_proxy = os.getenv("HTTP_PROXY", "").strip()
+    https_proxy = os.getenv("HTTPS_PROXY", "").strip()
+    proxy_server = http_proxy or https_proxy
     
-    proxy_server = os.getenv("PROXY_SERVER", "").strip()
+    # Fallback to PROXY_SERVER if HTTP_PROXY is not set (for backward compatibility)
+    if not proxy_server:
+        proxy_server = os.getenv("PROXY_SERVER", "").strip()
+    
     proxy_username = os.getenv("PROXY_USERNAME", "").strip()
     proxy_password = os.getenv("PROXY_PASSWORD", "").strip()
     
-    if proxy_server and not use_system_proxy:
+    if proxy_server:
         if proxy_username and proxy_password:
             # Create dynamic extension with credentials baked in (same as UC path)
             import tempfile
@@ -680,9 +541,7 @@ chrome.webRequest.onAuthRequired.addListener(
             options.add_argument(f'--proxy-server={proxy_server}')
             print(f"  Using proxy: {proxy_server}")
         sys.stdout.flush()
-    elif use_system_proxy and proxy_server:
-        print("  ✓ Using system-level proxy (proxychains4) - skipping browser-level proxy configuration")
-        sys.stdout.flush()
+
     
     print("  Creating Chrome driver instance...")
     sys.stdout.flush()
@@ -1018,4 +877,67 @@ def get_full_page_screenshot(driver):
         # Fallback to regular viewport screenshot
         return driver.get_screenshot_as_png()
 
+
+def get_ip_from_chrome(driver):
+    """
+    Get the public IP address by opening a new tab in Chrome, navigating to api.ipify.org,
+    reading the IP text, and closing the tab.
+    
+    This ensures we get the IP that Chrome is actually using (through proxy if configured),
+    not the system IP from requests.get.
+    
+    Args:
+        driver: Selenium WebDriver instance
+        
+    Returns:
+        str: IP address string, or None if failed
+    """
+    original_window = driver.current_window_handle
+    
+    try:
+        # Open a new tab
+        driver.execute_script("window.open('');")
+        
+        # Switch to the new tab
+        new_window = [window for window in driver.window_handles if window != original_window][0]
+        driver.switch_to.window(new_window)
+        
+        # Navigate to api.ipify.org
+        driver.get("https://api.ipify.org/")
+        
+        # Wait a moment for the page to load
+        time.sleep(1)
+        
+        # Get the IP text from the page body
+        ip_address = driver.find_element(By.TAG_NAME, "body").text.strip()
+        
+        # Close the new tab
+        driver.close()
+        
+        # Switch back to the original window
+        driver.switch_to.window(original_window)
+        
+        print(f"  ✓ IP detected from Chrome: {ip_address}")
+        sys.stdout.flush()
+        
+        return ip_address
+        
+    except Exception as e:
+        print(f"  Warning: Failed to get IP from Chrome: {e}")
+        sys.stdout.flush()
+        
+        # Make sure we switch back to the original window even if there's an error
+        try:
+            if original_window in driver.window_handles:
+                driver.switch_to.window(original_window)
+            # Close any extra windows that might have been opened
+            for window in driver.window_handles:
+                if window != original_window:
+                    driver.switch_to.window(window)
+                    driver.close()
+            driver.switch_to.window(original_window)
+        except:
+            pass
+        
+        return None
 

@@ -1,18 +1,34 @@
-version: '3.8'
-
 services:
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    container_name: embassy-eye-proxy
+    networks:
+      - proxynet
+    environment:
+      - PROXY_SERVER=${PROXY_SERVER}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+    env_file:
+      - .env
+    restart: unless-stopped
+
   embassy-eye:
     build: .
     container_name: embassy-eye
-    # IMPORTANT: Uncomment the line below if your VPN is running on the host
-    # This allows the container to use the host's VPN connection
-    network_mode: "host"
+    networks:
+      - proxynet
     environment:
       # Telegram configuration - set these in .env file or override here
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_USER_ID=${TELEGRAM_USER_ID}
-      # Optional: Proxy configuration
-      - PROXY_SERVER=${PROXY_SERVER:-}
+      # Proxy configuration - app will use the proxy service by name
+      - HTTP_PROXY=http://proxy:3128
+      - HTTPS_PROXY=http://proxy:3128
+      - NO_PROXY=localhost,127.0.0.1
+      # Keep original proxy vars for reference (proxy service uses them)
+      - PROXY_SERVER=${PROXY_SERVER}
       - PROXY_USERNAME=${PROXY_USERNAME:-}
       - PROXY_PASSWORD=${PROXY_PASSWORD:-}
     env_file:
@@ -23,6 +39,11 @@ services:
       # Mount project root to persist captcha_cooldown.json and allow code access
       # Note: Python packages are installed system-wide, so they remain available
       - .:/app
+    depends_on:
+      - proxy
     # Uncomment to run on a schedule (requires cron or similar)
     # restart: unless-stopped
 
+networks:
+  proxynet:
+    driver: bridge

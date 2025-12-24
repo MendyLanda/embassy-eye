@@ -12,7 +12,7 @@ def main():
     """Execute the booking workflow."""
     # Allow scraper selection via command line argument or environment variable
     scraper = "hungary"  # Default
-    location = "subotica"  # Default
+    location = "tel_aviv"  # Default
     
     if len(sys.argv) > 1:
         scraper = sys.argv[1]

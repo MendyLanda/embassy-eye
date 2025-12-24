@@ -157,8 +157,8 @@ def find_radio_option_by_text(driver, option_text):
     return None
 
 
-def select_consulate_option(driver, location="subotica"):
-    """Select consulate option from the dropdown based on location (subotica or belgrade)."""
+def select_consulate_option(driver, location="tel_aviv"):
+    """Select consulate option from the dropdown based on location (subotica, belgrade, or tel_aviv)."""
     config = get_consulate_config(location)
     consulate_option_text = config["consulate_option_text"]
     consulate_dropdown_id = config["consulate_dropdown_id"]
@@ -472,7 +472,7 @@ def find_save_button(driver, input_element=None):
     return None
 
 
-def select_visa_type_option(driver, location="subotica"):
+def select_visa_type_option(driver, location="tel_aviv"):
     """Select visa type option from the second dropdown based on location."""
     config = get_consulate_config(location)
     visa_type_dropdown_id = config["visa_type_dropdown_id"]

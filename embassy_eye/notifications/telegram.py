@@ -105,7 +105,7 @@ def send_telegram_document(filename: str, caption: str, file_bytes: bytes) -> bo
         return False
 
 
-def send_result_notification(slots_available: bool, screenshot_bytes: bytes = None, special_case: str = None, booking_url: str = None, location: str = None):
+def send_result_notification(slots_available: bool, screenshot_bytes: bytes = None, special_case: str = None, booking_url: str = None, location: str = None, chrome_ip: str = None):
     """
     Send appointment availability result notification.
     Only sends notification when slots are found.
@@ -116,14 +116,15 @@ def send_result_notification(slots_available: bool, screenshot_bytes: bytes = No
         special_case: String indicating special case: "captcha_required", "email_verification", or None
         booking_url: Optional booking URL to include in the message
         location: Optional location string (e.g., "subotica", "belgrade") to include in the message
+        chrome_ip: Optional IP address detected from Chrome browser
     """
     if not slots_available:
         # Don't send notification if no slots found
         return
     
     # Send healthcheck notification
-    ip_address, country = get_ip_and_country()
-    send_healthcheck_slots_found(country, location=location)
+    _, country = get_ip_and_country()
+    send_healthcheck_slots_found(country, location=location, ip_address=chrome_ip)
     
     # Base message
     location_display = location.capitalize() if location else ""
@@ -266,41 +267,49 @@ def send_healthcheck_message(message: str) -> bool:
         return False
 
 
-def send_healthcheck_slots_found(country: str = None, location: str = None):
+def send_healthcheck_slots_found(country: str = None, location: str = None, ip_address: str = None):
     """Send healthcheck notification when slots are found."""
     location_display = location.capitalize() if location else ""
     location_suffix = f" - {location_display}" if location_display else ""
     message = f"🔔 Healthcheck: Slots found{location_suffix}"
-    if country:
-        message += f" ({country})"
-    send_healthcheck_message(message)
-
-
-def send_healthcheck_slot_busy(country: str = None, location: str = None):
-    """Send healthcheck notification when all slots are busy."""
-    location_display = location.capitalize() if location else ""
-    location_suffix = f" - {location_display}" if location_display else ""
-    message = f"🔔 Healthcheck: Slot busy{location_suffix}"
-    if country:
-        message += f" ({country})"
-    send_healthcheck_message(message)
-
-
-def send_healthcheck_ip_blocked(ip_address: str, country: str = None, location: str = None):
-    """Send healthcheck notification when IP is blocked."""
-    location_display = location.capitalize() if location else ""
-    location_suffix = f" - {location_display}" if location_display else ""
-    message = f"🔔 Healthcheck: IP blocked{location_suffix}\nIP: {ip_address}"
+    if ip_address:
+        message += f"\nIP: {ip_address}"
     if country:
         message += f"\nCountry: {country}"
     send_healthcheck_message(message)
 
 
-def send_healthcheck_reloaded_page(reason: str = None, location: str = None):
+def send_healthcheck_slot_busy(country: str = None, location: str = None, ip_address: str = None):
+    """Send healthcheck notification when all slots are busy."""
+    location_display = location.capitalize() if location else ""
+    location_suffix = f" - {location_display}" if location_display else ""
+    message = f"🔔 Healthcheck: Slot busy{location_suffix}"
+    if ip_address:
+        message += f"\nIP: {ip_address}"
+    if country:
+        message += f"\nCountry: {country}"
+    send_healthcheck_message(message)
+
+
+def send_healthcheck_ip_blocked(ip_address: str, country: str = None, location: str = None, chrome_ip: str = None):
+    """Send healthcheck notification when IP is blocked."""
+    location_display = location.capitalize() if location else ""
+    location_suffix = f" - {location_display}" if location_display else ""
+    message = f"🔔 Healthcheck: IP blocked{location_suffix}\nBlocked IP: {ip_address}"
+    if chrome_ip:
+        message += f"\nChrome IP: {chrome_ip}"
+    if country:
+        message += f"\nCountry: {country}"
+    send_healthcheck_message(message)
+
+
+def send_healthcheck_reloaded_page(reason: str = None, location: str = None, ip_address: str = None):
     """Send healthcheck notification when page is reloaded for refilling form."""
     location_display = location.capitalize() if location else ""
     location_suffix = f" - {location_display}" if location_display else ""
     message = f"🔔 Healthcheck: Reloaded page for refilling form{location_suffix}"
+    if ip_address:
+        message += f"\nIP: {ip_address}"
     if reason:
         message += f"\nReason: {reason}"
     send_healthcheck_message(message)

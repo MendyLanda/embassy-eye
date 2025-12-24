@@ -11,13 +11,13 @@ from ..scrapers.hungary.runner import fill_booking_form as fill_hungary_form, fi
 from ..scrapers.italy.runner import fill_italy_login_form
 
 
-def fill_booking_form(scraper="hungary", location="subotica"):
+def fill_booking_form(scraper="hungary", location="tel_aviv"):
     """
     Fill the booking form using the specified scraper.
     
     Args:
         scraper: The scraper to use ('hungary' or 'italy'). Defaults to 'hungary'.
-        location: For Hungary scraper, either 'subotica', 'belgrade', or 'both'. Defaults to 'subotica'.
+        location: For Hungary scraper, either 'subotica', 'belgrade', 'tel_aviv', or 'both'. Defaults to 'tel_aviv'.
     """
     scraper = scraper.lower()
     location = location.lower()
@@ -38,7 +38,7 @@ def fill_booking_form(scraper="hungary", location="subotica"):
 if __name__ == "__main__":
     # Allow scraper selection via command line argument or environment variable
     scraper = "hungary"  # Default
-    location = "subotica"  # Default
+    location = "tel_aviv"  # Default
     
     if len(sys.argv) > 1:
         scraper = sys.argv[1]
